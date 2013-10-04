@@ -12,6 +12,7 @@ public class ExtensionIterator implements Iterator<Integer> {
 
   public ExtensionIterator(HashMap<Integer, ?> map, boolean terminal) {
     this.terminal = terminal;
+
     done = false;
     if (map == null) {
       done = true;

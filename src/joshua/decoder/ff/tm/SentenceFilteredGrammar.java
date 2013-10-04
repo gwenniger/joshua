@@ -5,7 +5,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map.Entry;
-
 import joshua.decoder.ff.tm.hash_based.ExtensionIterator;
 import joshua.decoder.segment_file.Sentence;
 
