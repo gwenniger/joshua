@@ -105,4 +105,18 @@ public class LabelSubstitutionFF extends StatelessFF {
     return null;
   }
 
+  private static abstract class LabelSubstitutionLabelSmoother{
+    protected abstract String createSmoothedLabelString(String originalLabelString);
+  }
+  
+  private static class NoSmoothingLabelSubstitutionLabelSmoother extends LabelSubstitutionLabelSmoother
+  {
+
+    @Override
+    protected String createSmoothedLabelString(String originalLabelString) {
+      return originalLabelString;
+    }
+    
+  }
+  
 }
