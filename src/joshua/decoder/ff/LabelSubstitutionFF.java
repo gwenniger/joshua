@@ -56,15 +56,12 @@ public class LabelSubstitutionFF extends StatelessFF {
     result += "_<Nont>";
     result += ListUtil.stringListStringWithoutBracketsCommaSeparated(ruleSourceNonterminals);
     result += "</Nont>";
-    if(isInverting)
-    {  
+    if (isInverting) {
       result += "_INV";
-    }
-    else
-    {
+    } else {
       result += "_MONO";
     }
-    
+
     return result;
   }
 
@@ -105,18 +102,16 @@ public class LabelSubstitutionFF extends StatelessFF {
     return null;
   }
 
-  private static abstract class LabelSubstitutionLabelSmoother{
+  private static abstract class LabelSubstitutionLabelSmoother {
     protected abstract String createSmoothedLabelString(String originalLabelString);
   }
-  
-  private static class NoSmoothingLabelSubstitutionLabelSmoother extends LabelSubstitutionLabelSmoother
-  {
 
+  private static class NoSmoothingLabelSubstitutionLabelSmoother extends
+      LabelSubstitutionLabelSmoother {
     @Override
     protected String createSmoothedLabelString(String originalLabelString) {
       return originalLabelString;
     }
-    
   }
-  
+
 }
