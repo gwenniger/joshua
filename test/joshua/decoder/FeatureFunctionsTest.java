@@ -30,7 +30,7 @@ public class FeatureFunctionsTest {
 
   private static String LABEL_COMBINATION_FEATURE_NAME = LabelCombinationFF
       .getLowerCasedFeatureName();
-  private static String LABEL_SUBSTITUTION_FEATURE_NAME = LabelSubstitutionFF.getLowerCasedFeatureName();
+  private static String LABEL_SUBSTITUTION_FEATURE_NAME = LabelSubstitutionFF.getLowerCasedFeatureNameStandardFeature();
 
   private static String FEATURE_FUNCTIONS_TEST_TEMP_FILES_FOLDER_NAME = "FeatureFunctionsTestTempFiles";
   private static String MAIN_GRAMMAR_FILE_NAME = "mainGrammar.gz";
@@ -270,6 +270,14 @@ public class FeatureFunctionsTest {
   }
   
 
+  /**
+   * Test the label substitution feature with smoothing for labels consisting of two parts. 
+   */
+  @Test
+  public void testLabelSubstitutionFeatureDoubleLabelFunction() {
+    testFeatureFunctions(LabelSubstitutionFF.getLowerCasedFeatureNameDoubleLabelFeature());
+  }
+  
   private static List<String> findAllFeatureOccurences(String contentsString,String featureName) {
     return NBestListUtility.findAllFeatureOccurences(contentsString,
         featureName);

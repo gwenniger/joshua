@@ -45,7 +45,7 @@ public abstract class NonterminalMatcher {
 	 */
 	private static final int MAX_TOTAL_NON_TERMINALS_FOR_TARGETED_QUERYING = 1000;
 
-	protected static boolean isOOVLabelOrGoalLabel(String label,
+	public static boolean isOOVLabelOrGoalLabel(String label,
 	    JoshuaConfiguration joshuaConfiguration) {
 		return (label.equals(joshuaConfiguration.default_non_terminal) || label
 		    .equals(joshuaConfiguration.goal_symbol));

@@ -11,6 +11,8 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.logging.Logger;
 
+import org.w3c.dom.ls.LSSerializerFilter;
+
 import joshua.corpus.Vocabulary;
 import joshua.decoder.ff.FeatureVector;
 import joshua.decoder.ff.FeatureFunction;
@@ -679,8 +681,11 @@ public class Decoder {
         this.featureFunctions.add(new LabelCombinationFF(weights));
       }
       
-      else if (feature.equals(LabelSubstitutionFF.getLowerCasedFeatureName())) {
-        this.featureFunctions.add(new LabelSubstitutionFF(weights));
+      else if (feature.equals(LabelSubstitutionFF.getLowerCasedFeatureNameStandardFeature())) {
+        this.featureFunctions.add(LabelSubstitutionFF.createStandardLabelSubstitutionFF(weights,joshuaConfiguration));
+      }
+      else if (feature.equals(LabelSubstitutionFF.getLowerCasedFeatureNameDoubleLabelFeature())) {
+        this.featureFunctions.add(LabelSubstitutionFF.createLabelSubstitutionFFDoubleLabel(weights,joshuaConfiguration));
       }
 
       else {
