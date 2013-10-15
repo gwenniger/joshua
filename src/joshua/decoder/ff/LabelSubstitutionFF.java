@@ -20,6 +20,8 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
   private static final String MATCH_SUFFIX = "MATCH";
   private static final String NO_MATCH_SUFFIX = "NOMATCH";
 
+  private static final String FUZZY_MATCHING_GLUE_GRAMMAR_NONTERIMINAL = "[X]";
+
   private final JoshuaConfiguration joshuaConfiguration;
   private final List<LabelSubstitutionLabelSmoother> labelSmoothersList;
 
@@ -36,21 +38,21 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
     return new LabelSubstitutionBasicFF(weights, getFeatureNameStandardFeature(),
         joshuaConfiguration, createNoSmoothingLabelSubstiontionSmoothersList());
   }
-  
-  public static LabelSubstitutionSparseFF createStandardLabelSubstitutionSparseFF(FeatureVector weights,
-      JoshuaConfiguration joshuaConfiguration) {
+
+  public static LabelSubstitutionSparseFF createStandardLabelSubstitutionSparseFF(
+      FeatureVector weights, JoshuaConfiguration joshuaConfiguration) {
     return new LabelSubstitutionSparseFF(weights, getFeatureNameStandardFeature(),
         joshuaConfiguration, createNoSmoothingLabelSubstiontionSmoothersList());
   }
 
-  public static LabelSubstitutionBasicFF createLabelSubstitutionFFDoubleLabel(FeatureVector weights,
-      JoshuaConfiguration joshuaConfiguration) {
+  public static LabelSubstitutionBasicFF createLabelSubstitutionFFDoubleLabel(
+      FeatureVector weights, JoshuaConfiguration joshuaConfiguration) {
     return new LabelSubstitutionBasicFF(weights, getFeatureNameDoubleLabelFeature(),
         joshuaConfiguration, createDoubleLabelSmoothingLabelSubstiontionSmoothersList());
   }
-  
-  public static LabelSubstitutionSparseFF createLabelSubstitutionFFDoubleLabelSparse(FeatureVector weights,
-      JoshuaConfiguration joshuaConfiguration) {
+
+  public static LabelSubstitutionSparseFF createLabelSubstitutionFFDoubleLabelSparse(
+      FeatureVector weights, JoshuaConfiguration joshuaConfiguration) {
     return new LabelSubstitutionSparseFF(weights, getFeatureNameDoubleLabelFeature(),
         joshuaConfiguration, createDoubleLabelSmoothingLabelSubstiontionSmoothersList());
   }
@@ -58,7 +60,7 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
   public static String getFeatureNameStandardFeature() {
     return STANDARD_LABEL_SUBSTITUTION_BASIC_FEATURE_FUNCTION_NAME;
   }
-  
+
   public static String getFeatureNameStandardSparseFeature() {
     return STANDARD_LABEL_SUBSTITUTION_SPARSE_FEATURE_FUNCTION_NAME;
   }
@@ -66,11 +68,10 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
   public static String getFeatureNameDoubleLabelFeature() {
     return DOUBLE_LABEL_SMOOTHED_LABEL_SUBSTITUTION_BASIC_FEATURE_FUNCTION_NAME;
   }
-  
+
   public static String getFeatureNameDoubleLabelSparseFeature() {
     return DOUBLE_LABEL_SMOOTHED_LABEL_SUBSTITUTION_SPARSE_FEATURE_FUNCTION_NAME;
   }
-
 
   private static List<LabelSubstitutionLabelSmoother> createNoSmoothingLabelSubstiontionSmoothersList() {
     List<LabelSubstitutionLabelSmoother> result = new ArrayList<LabelSubstitutionLabelSmoother>();
@@ -180,6 +181,10 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
 
   }
 
+  private boolean isFuzzyMatchingGlueGrammarNonterminal(String ruleNonterminal) {
+    return ruleNonterminal.equals(FUZZY_MATCHING_GLUE_GRAMMAR_NONTERIMINAL);
+  }
+
   /**
    * This method adds the basic label substitution features: 1. Label matching features (MATCH and
    * NOMATCH) 2. Simple Label substitution features: LabelX substitutes LabelY
@@ -196,14 +201,26 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
       String ruleNonterminal = ruleSourceNonterminals.get(nonterinalIndex);
       String substitutionNonterminal = substitutionNonterminals.get(nonterinalIndex);
 
-      // We only want to add matching and substitution features for labels that are
-      // actually allowed to match something apart from themselves. The GOAL and OOV
-      // label which can only match themselves otherwise distort the information of the
-      // "real" (i.e. free) substitutions
+      /**
+       *  We only want to add matching and substitution features for labels that are
+       *  actually allowed to match something apart from themselves. The GOAL and OOV
+       *  label which can only match themselves otherwise distort the information of the
+       *  real" (i.e. free) substitutions
+       */
       if (!NonterminalMatcher.isOOVLabelOrGoalLabel(ruleNonterminal, joshuaConfiguration)) {
-        acc.add(
-            computeLabelMatchingFeature(ruleNonterminal, substitutionNonterminal,
-                labelSubstitutionLabelSmoother), 1);
+
+        /**
+         * For matching features, we are furthermore not interested in substitutions of labels for
+         * the glue grammar nonterminal symbol ([X]) as such substitutions are necessary and again
+         * would confuse the intended purpose of this feature, as something that counts fully
+         * optional substitutions of either matching labels or non-matching labels.
+         */
+        if (!isFuzzyMatchingGlueGrammarNonterminal(ruleNonterminal)) {
+          acc.add(
+              computeLabelMatchingFeature(ruleNonterminal, substitutionNonterminal,
+                  labelSubstitutionLabelSmoother), 1);
+        }
+
         acc.add(
             computeLabelSubstitutionFeature(ruleNonterminal, substitutionNonterminal,
                 labelSubstitutionLabelSmoother), 1);
@@ -253,9 +270,10 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
             ruleSourceNonterminals, substitutionNonterminals))) {
           // Assert.assertEquals(ruleSourceNonterminals.size(), substitutionNonterminals.size());
 
-          // Add the features. Depending on the implementation these are only the basic features 
+          // Add the features. Depending on the implementation these are only the basic features
           // or the basic features and sparse feature
-          addFeatures(acc, labelSubstitutionLabelSmoother, ruleSourceNonterminals, substitutionNonterminals, rule, tailNodes);
+          addFeatures(acc, labelSubstitutionLabelSmoother, ruleSourceNonterminals,
+              substitutionNonterminals, rule, tailNodes);
         }
       }
     }
