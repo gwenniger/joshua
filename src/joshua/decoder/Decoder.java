@@ -10,9 +10,6 @@ import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.logging.Logger;
-
-import org.w3c.dom.ls.LSSerializerFilter;
-
 import joshua.corpus.Vocabulary;
 import joshua.decoder.ff.FeatureVector;
 import joshua.decoder.ff.FeatureFunction;
@@ -616,7 +613,12 @@ public class Decoder {
 
     return weights;
   }
-
+  
+  public static boolean stringsEqualIgnoreCase(String string1, String string2){
+    return ((string1.toLowerCase()).equals((string2.toLowerCase())));
+  }
+  
+  
   /**
    * Feature functions are instantiated with a line of the form
    * 
@@ -681,11 +683,17 @@ public class Decoder {
         this.featureFunctions.add(new LabelCombinationFF(weights));
       }
       
-      else if (feature.equals(LabelSubstitutionFF.getLowerCasedFeatureNameStandardFeature())) {
+      else  if (stringsEqualIgnoreCase(feature, LabelSubstitutionFF.getFeatureNameStandardFeature())){
         this.featureFunctions.add(LabelSubstitutionFF.createStandardLabelSubstitutionFF(weights,joshuaConfiguration));
       }
-      else if (feature.equals(LabelSubstitutionFF.getLowerCasedFeatureNameDoubleLabelFeature())) {
+      else  if (stringsEqualIgnoreCase(feature, LabelSubstitutionFF.getFeatureNameStandardSparseFeature())){
+        this.featureFunctions.add(LabelSubstitutionFF.createStandardLabelSubstitutionSparseFF(weights,joshuaConfiguration));
+      }
+      else if (stringsEqualIgnoreCase(feature,LabelSubstitutionFF.getFeatureNameDoubleLabelFeature())) {
         this.featureFunctions.add(LabelSubstitutionFF.createLabelSubstitutionFFDoubleLabel(weights,joshuaConfiguration));
+      }
+      else if (stringsEqualIgnoreCase(feature,LabelSubstitutionFF.getFeatureNameDoubleLabelSparseFeature())) {
+        this.featureFunctions.add(LabelSubstitutionFF.createLabelSubstitutionFFDoubleLabelSparse(weights,joshuaConfiguration));
       }
 
       else {

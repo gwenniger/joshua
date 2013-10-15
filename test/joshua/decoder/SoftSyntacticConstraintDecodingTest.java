@@ -16,7 +16,7 @@ public class SoftSyntacticConstraintDecodingTest {
   protected static String SOFT_SYNTACTIC_CONSTRAINT_DECODING_TEST_TEMP_FILES_FOLDER_NAME = "SoftSyntacticConstraintDecodingTestTempFiles";
 
   private static String LABEL_SUBSTITUTION_FEATURE_NAME = LabelSubstitutionFF
-      .getLowerCasedFeatureNameStandardFeature();
+      .getFeatureNameStandardFeature();
   protected static String MAIN_GRAMMAR_FILE_NAME = "mainGrammar.txt";
   protected static String MAIN_GRAMMAR_FILE_WITH_INVERSION_RULE_NAME = "mainGrammarWithInversionRule.txt";
   protected static String GLUE_GRAMMAR_FILE_NAME = "glueGrammar.txt";
