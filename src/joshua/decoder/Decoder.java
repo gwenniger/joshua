@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.logging.Logger;
+
 import joshua.corpus.Vocabulary;
 import joshua.decoder.ff.FeatureVector;
 import joshua.decoder.ff.FeatureFunction;
@@ -29,6 +30,7 @@ import joshua.decoder.ff.similarity.EdgePhraseSimilarityFF;
 import joshua.decoder.ff.tm.Grammar;
 import joshua.decoder.ff.tm.GrammarFactory;
 import joshua.decoder.ff.tm.hash_based.MemoryBasedBatchGrammar;
+import joshua.decoder.ff.tm.hash_based.MemoryBasedBatchGrammarEfficientNonterminalLookup;
 import joshua.decoder.ff.tm.packed.PackedGrammar;
 import joshua.decoder.io.TranslationRequest;
 import joshua.decoder.segment_file.Sentence;
@@ -538,7 +540,13 @@ public class Decoder {
             System.exit(2);
           }
 
-        } else if (format.equals("thrax") || format.equals("regexp")) {
+        } else if(joshuaConfiguration.fuzzy_matching){
+          // Create a MemoryBasedBatchGrammar with efficient nonterminal lookup. This 
+          // is important to make the fuzzy_matching decoding go fast
+          grammar = new MemoryBasedBatchGrammarEfficientNonterminalLookup(format, file, owner,
+              joshuaConfiguration.default_non_terminal, span_limit,joshuaConfiguration);
+          }
+          else if (format.equals("thrax") || format.equals("regexp")) {
           grammar = new MemoryBasedBatchGrammar(format, file, owner,
               joshuaConfiguration.default_non_terminal, span_limit,joshuaConfiguration);
         }

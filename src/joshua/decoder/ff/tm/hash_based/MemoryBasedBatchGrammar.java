@@ -160,6 +160,17 @@ public class MemoryBasedBatchGrammar extends BatchGrammar {
     return this.root;
   }
 
+  
+  /**
+   * Method that creates a new MemoryBasedTrie. This will be overwritten in 
+   * the subclass MemoryBasedBatchGrammarEfficientNonterminalLookup with 
+   * a specialization of MemoryBasedTrie that is more efficient for the lookup of 
+   * nonterminals by caching them
+   * @return
+   */
+  protected MemoryBasedTrie createNewTrie(){
+    return new MemoryBasedTrie();
+  }
 
   /**
    * Adds a rule to the grammar
@@ -194,7 +205,7 @@ public class MemoryBasedBatchGrammar extends BatchGrammar {
 
       MemoryBasedTrie nextLayer = (MemoryBasedTrie) pos.match(curSymID);
       if (null == nextLayer) {
-        nextLayer = new MemoryBasedTrie();
+        nextLayer = createNewTrie();
         if (pos.hasExtensions() == false) {
           pos.childrenTbl = new HashMap<Integer, MemoryBasedTrie>();
         }
