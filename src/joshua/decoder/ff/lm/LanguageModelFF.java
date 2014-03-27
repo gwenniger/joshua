@@ -155,7 +155,8 @@ public class LanguageModelFF extends StatefulFF {
 
       boolean considerIncompleteNgrams = true;
       boolean skipStart = true;
-      if (words.get(0) != START_SYM_ID) {
+      // First condition is required to work also with unigram language models (currently only supported by berkeleylm)
+      if ((words.size() > 0 ) && (words.get(0) != START_SYM_ID)) {
         skipStart = false;
       }
       estimate += scoreChunkLogP(words, considerIncompleteNgrams, skipStart);
