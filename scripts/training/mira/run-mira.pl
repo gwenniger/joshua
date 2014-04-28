@@ -542,10 +542,32 @@ if ($continue) {
 #    print "($step) BEST at $step $bestpoint => $devbleu at ".`date`;
     my $num_features = scalar(keys(%$bestpoint));
     print "($step) BEST at $step ($num_features features) => $devbleu at ".`date`;
-    my %newweights = %$bestpoint;
-
+    
+    # Gideon 28-4-2014 : This code does not work properly
+    # my %newweights = %$bestpoint; # This is not helpfull
     # update my cache of lambda values
-    map { $featlist->{$_}{value} = $newweights{$_}{value} } (keys %newweights);
+    # map { $featlist->{$_}{value} = $newweights{$_}{value} } (keys %newweights); # This does not work, since the sizes of the two 
+    # Sets of items are mismatching: the newweights, that come from the "mert.out" file do not contain weights for all the features 
+    # nescessarily
+    
+    # Gideon 28-4-2014 REPLACEMENT CODE: Just override the initial weights with the last finished + 1 iteration's 
+    # <REPLACEMENT CODE> #
+    # Assumption: We have nothing for the next iteration, except the (Joshua) configuration
+	# We use that configuration to (re)read the weights, replacing the original weights with these
+	# This solves all the issues with  "get_weights_from_mert" which actually works badly with sparse features
+	# (Re)READ the feature weights from the next (unfinished) iteration rather than the first one
+	my $last_iteration_config = "run" . ($step+1) . ".joshua.config";	
+	print STDERR  "last_iteration_config" . ($last_iteration_config );
+	# Read the list of weights from the weights file
+	$featlist = get_featlist_from_file(($last_iteration_config ));
+	$featlist = insert_ranges_to_featlist($featlist, $___RANGES);
+	# Mark which features are disabled:
+	# all enabled
+	foreach my $name (keys %$featlist) {
+	  $featlist->{$name}{enabled} = 1;
+	}
+    #</REPLACEMENT CODE> #
+    
   } else {
     print STDERR "No previous data are needed\n";
   }
