@@ -2,10 +2,12 @@ package joshua.decoder.chart_parser;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.logging.Logger;
+
 import joshua.corpus.Vocabulary;
 import joshua.decoder.JoshuaConfiguration;
 import joshua.decoder.chart_parser.DotChart.DotNode;
@@ -121,7 +123,7 @@ public abstract class NonterminalMatcher {
   public static List<Trie> produceStandardMatchingChildTNodesNonterminalLevel(DotNode dotNode,
       SuperNode superNode) {
     Trie child_node = dotNode.getTrieNode().match(superNode.lhs);
-    List<Trie> child_tnodes = Arrays.asList(child_node);
+    List<Trie> child_tnodes = Collections.singletonList(child_node);
     return child_tnodes;
   }
 
@@ -177,7 +179,7 @@ public abstract class NonterminalMatcher {
         // Vocabulary.word(superNode.lhs));
         Trie child_node = dotNode.getTrieNode().match(superNode.lhs);
         // logger.info("child_node.toString()" + child_node);
-        List<Trie> child_tnodes = Arrays.asList(child_node);
+        List<Trie> child_tnodes = Collections.singletonList(child_node);
         return child_tnodes;
       } else {
         // logger.info("Vocabulary.word(superNode.lhs): " +
