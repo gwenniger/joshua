@@ -417,23 +417,22 @@ class DotChart {
    * A DotNode represents the partial application of a rule rooted to a particular span (i,j). It
    * maintains a pointer to the trie node in the grammar for efficient mapping.
    */
-  static class DotNode {
+  static abstract class DotNodeBase {
 
     // =======================================================
     // Package-protected instance fields
     // =======================================================
 
     // int i, j; //start and end position in the chart
-    private Trie trieNode = null; // dot_position, point to grammar trie node, this is the only
+    protected Trie trieNode = null; // dot_position, point to grammar trie node, this is the only
                                   // place that the DotChart points to the grammar
-    private List<SuperNode> antSuperNodes = null; // pointer to SuperNode in Chart
-    private SourcePath srcPath;
+    
+    protected SourcePath srcPath;
 
-    public DotNode(int i, int j, Trie trieNode, List<SuperNode> antSuperNodes, SourcePath srcPath) {
+    protected  DotNodeBase(int i, int j, Trie trieNode, SourcePath srcPath) {
       // i = i_in;
       // j = j_in;
       this.trieNode = trieNode;
-      this.antSuperNodes = antSuperNodes;
       this.srcPath = srcPath;
     }
 
@@ -442,7 +441,7 @@ class DotChart {
         return false;
       if (!this.getClass().equals(obj.getClass()))
         return false;
-      DotNode state = (DotNode) obj;
+      DotNodeBase state = (DotNodeBase) obj;
 
       /*
        * Technically, we should be comparing the span inforamtion as well, but that would require us
@@ -478,9 +477,41 @@ class DotChart {
     public SourcePath getSourcePath() {
       return srcPath;
     }
-
+  }
+  
+  /**
+   * A DotNode represents the partial application of a rule rooted to a particular span (i,j). It
+   * maintains a pointer to the trie node in the grammar for efficient mapping.
+   */
+  static class DotNode extends DotNodeBase{
+  
+    private List<SuperNode> antSuperNodes = null; // pointer to SuperNode in Chart
+    
+    public DotNode(int i, int j, Trie trieNode, List<SuperNode> antSuperNodes, SourcePath srcPath) {
+      super(i,j,trieNode,srcPath);
+      this.antSuperNodes = antSuperNodes;
+    }
+    
     public List<SuperNode> getAntSuperNodes() {
       return antSuperNodes;
+    }    
+  }
+  
+  /**
+   * A specialized DotNode class that will be used for efficiently decoding 
+   * with fuzzy matching, compactly storing many DotItems that are identical,
+   * except for their labels
+   */
+  static class DotNodeMultiLabel extends DotNodeBase{    
+    private List<List<SuperNode>> antSuperNodeLists = null; 
+    
+    public DotNodeMultiLabel(int i, int j, Trie trieNode, List<List<SuperNode>> antSuperNodeLists, SourcePath srcPath) {
+      super(i,j,trieNode,srcPath);
+      this.antSuperNodeLists = antSuperNodeLists;
+    }
+    
+    public List<List<SuperNode>> getAntSuperNodeLists() {
+      return antSuperNodeLists;
     }
   }
 
