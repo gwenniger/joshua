@@ -1,7 +1,6 @@
 package joshua.decoder.chart_parser;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -11,7 +10,13 @@ import java.util.logging.Logger;
 import joshua.corpus.Vocabulary;
 import joshua.decoder.JoshuaConfiguration;
 import joshua.decoder.chart_parser.DotChart.DotNode;
+import joshua.decoder.chart_parser.DotChart.DotNodeBase;
+import joshua.decoder.chart_parser.DotChart.DotNodeMultiLabel;
+import joshua.decoder.chart_parser.DotNodeTypeCreater.DotNodeCreater;
+import joshua.decoder.chart_parser.DotNodeTypeCreater.DotNodeMultiLabelCreater;
+import joshua.decoder.ff.tm.Grammar;
 import joshua.decoder.ff.tm.Trie;
+import joshua.lattice.Lattice;
 
 /**
  * This abstract class and its implementations serve to refine the behavior of DotChart using
@@ -29,7 +34,7 @@ import joshua.decoder.ff.tm.Trie;
  * @author Gideon Maillette de Buy Wenniger <gemdbw AT gmail DOT com>
  * 
  */
-public abstract class NonterminalMatcher {
+public abstract class NonterminalMatcher <T extends DotNodeBase> {
 
   public static boolean isOOVLabelOrGoalLabel(String label, JoshuaConfiguration joshuaConfiguration) {
     return (label.equals(joshuaConfiguration.default_non_terminal) || label
@@ -53,7 +58,7 @@ public abstract class NonterminalMatcher {
     return result;
   }
 
-  public static NonterminalMatcher createNonterminalMatcher(Logger logger,
+  public static NonterminalMatcher<?> createNonterminalMatcher(Logger logger,
       JoshuaConfiguration joshuaConfiguration) {
     List<Integer> allNonterminalIndicesExceptForGoalAndOOV = getAllNonterminalIndicesExceptForGoalAndOOV(joshuaConfiguration);
 
@@ -69,6 +74,27 @@ public abstract class NonterminalMatcher {
     }
   }
 
+  @SuppressWarnings("unchecked")
+  public static DotChart<?,?> createDotChart(Logger logger,
+      JoshuaConfiguration joshuaConfiguration, Lattice<Integer> inputLattice,
+      Grammar grammar,Chart theChart,NonterminalMatcher<?> nonterminalMatcher
+      ) {
+    List<Integer> allNonterminalIndicesExceptForGoalAndOOV = getAllNonterminalIndicesExceptForGoalAndOOV(joshuaConfiguration);
+
+    if (allNonterminalIndicesExceptForGoalAndOOV.isEmpty()) {
+      throw new RuntimeException(
+          "Error: NonterminalMatcherFactory. createNonterminalMatcher -  empty nonterminal indices table");
+    }
+
+    if (joshuaConfiguration.fuzzy_matching) {
+      DotNodeMultiLabelCreater  dotNodeMultiLabelCreater  = new  DotNodeMultiLabelCreater();
+      return new DotChart<DotNodeMultiLabel,List<SuperNode>>(inputLattice,grammar, theChart, (NonterminalMatcher<DotNodeMultiLabel>) nonterminalMatcher,dotNodeMultiLabelCreater, grammar.isRegexpGrammar());
+    } else {     
+      DotNodeCreater dotNodeCreater =  new DotNodeCreater();
+      return new DotChart<DotNode,SuperNode>(inputLattice,grammar, theChart, (NonterminalMatcher<DotNode>) nonterminalMatcher,dotNodeCreater, grammar.isRegexpGrammar());
+    }
+  }
+  
   protected final Logger logger;
   protected final JoshuaConfiguration joshuaConfiguration;
 
@@ -84,8 +110,11 @@ public abstract class NonterminalMatcher {
    * @param superNode
    * @return
    */
-  public abstract List<Trie> produceMatchingChildTNodesNonterminalLevel(DotNode dotNode,
+  public abstract List<Trie> produceMatchingChildTNodesNonterminalLevel(T dotNode,
       SuperNode superNode);
+  
+  
+  protected abstract boolean performFuzzyMatching();
 
   private static boolean isNonterminal(int wordIndex) {
     return wordIndex < 0;
@@ -107,7 +136,7 @@ public abstract class NonterminalMatcher {
 
   }
 
-  protected List<Trie> matchAllEqualOrBothNonTerminalAndNotGoalOrOOV(DotNode dotNode, int wordID) {
+  protected List<Trie> matchAllEqualOrBothNonTerminalAndNotGoalOrOOV(DotNodeMultiLabel dotNode, int wordID) {
 
     // logger.info("wordID: " + wordID + " Vocabulary.word(Math.abs(wordID)) "
     // + Vocabulary.word(Math.abs(wordID)));
@@ -120,6 +149,26 @@ public abstract class NonterminalMatcher {
 
   }
 
+  public List<SuperNode> getOOAndGoalLabelSuperNodeSubList(List<SuperNode> superNodes){
+    List<SuperNode> result = new ArrayList<SuperNode>();
+    for(SuperNode superNode : superNodes){
+      if(isOOVLabelOrGoalLabel(Vocabulary.word(superNode.lhs), joshuaConfiguration)){
+        result.add(superNode);
+      }
+    }
+    return result;
+  }
+  
+  public List<SuperNode> getNeitherOOVNorGoalLabelSuperNodeSubList(List<SuperNode> superNodes){
+    List<SuperNode> result = new ArrayList<SuperNode>();
+    for(SuperNode superNode : superNodes){
+      if(!isOOVLabelOrGoalLabel(Vocabulary.word(superNode.lhs), joshuaConfiguration)){
+        result.add(superNode);
+      }
+    }
+    return result;
+  }
+  
   public static List<Trie> produceStandardMatchingChildTNodesNonterminalLevel(DotNode dotNode,
       SuperNode superNode) {
     Trie child_node = dotNode.getTrieNode().match(superNode.lhs);
@@ -127,14 +176,14 @@ public abstract class NonterminalMatcher {
     return child_tnodes;
   }
 
-  protected abstract static class StandardNonterminalMatcher extends NonterminalMatcher {
+  protected abstract static class StandardNonterminalMatcher<T extends DotNodeBase> extends NonterminalMatcher<T> {
 
     protected StandardNonterminalMatcher(Logger logger, JoshuaConfiguration joshuaConfiguration) {
       super(logger, joshuaConfiguration);
     }
   }
 
-  protected static class StandardNonterminalMatcherStrict extends StandardNonterminalMatcher {
+  protected static class StandardNonterminalMatcherStrict extends StandardNonterminalMatcher<DotNode> {
 
     protected StandardNonterminalMatcherStrict(Logger logger,
         JoshuaConfiguration joshuaConfiguration) {
@@ -146,10 +195,15 @@ public abstract class NonterminalMatcher {
         SuperNode superNode) {
       return produceStandardMatchingChildTNodesNonterminalLevel(dotNode, superNode);
     }
+
+    @Override
+    protected boolean performFuzzyMatching() {
+      return false;
+    }
   }
 
   protected static class StandardNonterminalMatcherSoftConstraints extends
-      StandardNonterminalMatcher {
+      StandardNonterminalMatcher<DotNodeMultiLabel> {
 
     /**
      * 
@@ -169,7 +223,7 @@ public abstract class NonterminalMatcher {
      * @param dotNode
      * @param superNode
      */
-    public List<Trie> produceMatchingChildTNodesNonterminalLevel(DotNode dotNode,
+    public List<Trie> produceMatchingChildTNodesNonterminalLevel(DotNodeMultiLabel dotNode,
         SuperNode superNode) {
 
       // We do not allow substitution of other things for GOAL labels or OOV
@@ -187,5 +241,12 @@ public abstract class NonterminalMatcher {
         return matchAllEqualOrBothNonTerminalAndNotGoalOrOOV(dotNode, superNode.lhs);
       }
     }
+
+    @Override
+    protected boolean performFuzzyMatching() {
+      return true;
+    }
   }
+  
+  
 }

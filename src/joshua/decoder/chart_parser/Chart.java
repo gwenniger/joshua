@@ -1,6 +1,7 @@
 package joshua.decoder.chart_parser;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -8,11 +9,14 @@ import java.util.PriorityQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.junit.Assert;
+
 import joshua.corpus.Vocabulary;
 import joshua.corpus.syntax.SyntaxTree;
 import joshua.decoder.JoshuaConfiguration;
 import joshua.decoder.chart_parser.CubePruneState;
 import joshua.decoder.chart_parser.DotChart.DotNode;
+import joshua.decoder.chart_parser.DotChart.DotNodeMultiLabel;
 import joshua.decoder.ff.FeatureFunction;
 import joshua.decoder.ff.SourceDependentFF;
 import joshua.decoder.ff.tm.Grammar;
@@ -46,7 +50,7 @@ import joshua.util.ChartSpan;
  * @author Matt Post <post@cs.jhu.edu>
  */
 
-public class Chart {
+public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2> {
 
   private final JoshuaConfiguration joshuaConfiguration;
   // ===========================================================
@@ -71,7 +75,7 @@ public class Chart {
   private int sourceLength;
   private List<FeatureFunction> featureFunctions;
   private Grammar[] grammars;
-  private DotChart[] dotcharts; // each grammar should have a dotchart associated with it
+  private DotChart<T,T2>[] dotcharts; // each grammar should have a dotchart associated with it
   private Cell goalBin;
   private int goalSymbolID = -1;
   private Lattice<Integer> inputLattice;
@@ -103,6 +107,7 @@ public class Chart {
    * course, we get passed the grammars too so we could move all of that into here.
    */
 
+  @SuppressWarnings("unchecked")
   public Chart(Sentence sentence, List<FeatureFunction> featureFunctions, Grammar[] grammars,
       String goalSymbol, JoshuaConfiguration joshuaConfiguration) {
     this.joshuaConfiguration = joshuaConfiguration;
@@ -131,9 +136,12 @@ public class Chart {
     // each grammar will have a dot chart
     this.dotcharts = new DotChart[this.grammars.length];
     for (int i = 0; i < this.grammars.length; i++)
-      this.dotcharts[i] = new DotChart(this.inputLattice, this.grammars[i], this,
-          NonterminalMatcher.createNonterminalMatcher(logger,joshuaConfiguration),this.grammars[i].isRegexpGrammar());
+      //this.dotcharts[i] = new DotChart(this.inputLattice, this.grammars[i], this,
+      //    NonterminalMatcher.createNonterminalMatcher(logger,joshuaConfiguration),this.grammars[i].isRegexpGrammar());
+      this.dotcharts[i] = (DotChart<T, T2>) NonterminalMatcher.createDotChart(logger, joshuaConfiguration, inputLattice,this.grammars[i], 
+          this, NonterminalMatcher.createNonterminalMatcher(logger,joshuaConfiguration)); 
 
+      
     // Begin to do initialization work
 
     // TODO: which grammar should we use to create a manual rule?
@@ -278,7 +286,7 @@ public class Chart {
           || null == dotcharts[g].getDotCell(i, j))
         continue;
       // for each rule with applicable rules
-      for (DotNode dotNode : dotcharts[g].getDotCell(i, j).getDotNodes()) {
+      for (T dotNode : dotcharts[g].getDotCell(i, j).getDotNodes()) {
         RuleCollection ruleCollection = dotNode.getApplicableRules();
         if (ruleCollection == null)
           continue;
@@ -313,26 +321,65 @@ public class Chart {
         } else {
 
           Rule bestRule = rules.get(0);
+          
+          if(peformFuzzyMatching()){
+            
+            @SuppressWarnings("unchecked")
+            List<List<SuperNode>> superNodes = (List<List<SuperNode>>) dotNode.getAntSuperNodes();
+            
+            List<List<SuperNode>>   unpackedSuperNodeLists =  unpackAllPossibleSuperNodeCombinations(superNodes);
+            Assert.assertFalse(unpackedSuperNodeLists.isEmpty());
+            for(List<SuperNode> unpackedSuperNodeList : unpackedSuperNodeLists){              
+              List<HGNode> currentAntNodes = new ArrayList<HGNode>();
+              
+              for (SuperNode si : unpackedSuperNodeList) {
+                // TODO: si.nodes must be sorted
+                currentAntNodes.add(si.nodes.get(0));
+              }
 
-          List<HGNode> currentAntNodes = new ArrayList<HGNode>();
-          List<SuperNode> superNodes = dotNode.getAntSuperNodes();
-          for (SuperNode si : superNodes) {
-            // TODO: si.nodes must be sorted
-            currentAntNodes.add(si.nodes.get(0));
+              ComputeNodeResult result = new ComputeNodeResult(featureFunctions, bestRule,
+                  currentAntNodes, i, j, sourcePath, this.segmentID);
+
+              int[] ranks = new int[1 + unpackedSuperNodeList.size()];
+              for (int r = 0; r < ranks.length; r++)
+                ranks[r] = 1;
+
+              CubePruneState bestState = new CubePruneState(result, ranks, rules, currentAntNodes);
+
+              DotNodeMultiLabel castDotNodeMultiLabel = (DotNodeMultiLabel) dotNode;
+              DotNode basicDotNode = new DotNode(i, j, castDotNodeMultiLabel.getTrieNode(), unpackedSuperNodeList, castDotNodeMultiLabel.getSourcePath());
+              bestState.setDotNode(basicDotNode);
+              candidates.add(bestState);
+              visitedStates.add(bestState);
+  
+            }
+            
           }
+          else{
+            // No fuzzy matching
+            List<HGNode> currentAntNodes = new ArrayList<HGNode>();
+            @SuppressWarnings("unchecked")
+            List<SuperNode> superNodes = (List<SuperNode>) dotNode.getAntSuperNodes();
+            for (SuperNode si : superNodes) {
+              // TODO: si.nodes must be sorted
+              currentAntNodes.add(si.nodes.get(0));
+            }
 
-          ComputeNodeResult result = new ComputeNodeResult(featureFunctions, bestRule,
-              currentAntNodes, i, j, sourcePath, this.segmentID);
+            ComputeNodeResult result = new ComputeNodeResult(featureFunctions, bestRule,
+                currentAntNodes, i, j, sourcePath, this.segmentID);
 
-          int[] ranks = new int[1 + superNodes.size()];
-          for (int r = 0; r < ranks.length; r++)
-            ranks[r] = 1;
+            int[] ranks = new int[1 + superNodes.size()];
+            for (int r = 0; r < ranks.length; r++)
+              ranks[r] = 1;
 
-          CubePruneState bestState = new CubePruneState(result, ranks, rules, currentAntNodes);
+            CubePruneState bestState = new CubePruneState(result, ranks, rules, currentAntNodes);
 
-          bestState.setDotNode(dotNode);
-          candidates.add(bestState);
-          visitedStates.add(bestState);
+            DotNode dotNodeCasted = (DotNode) dotNode;
+            bestState.setDotNode(dotNodeCasted);
+            candidates.add(bestState);
+            visitedStates.add(bestState);
+            
+          }
         }
       }
     }
@@ -395,6 +442,32 @@ public class Chart {
     }
   }
 
+  private boolean peformFuzzyMatching(){
+    return this.dotcharts[0].performFuzzyMatching();
+  }
+  
+  private static final <T> List<List<T>> unpackAllPossibleSuperNodeCombinations(List<List<T>> listOfSuperNodesLists){
+    List<List<T>> result = new ArrayList<List<T>>();
+    
+    for(List<T> superNodeListI : listOfSuperNodesLists){
+      // We make a temporary copy of the list to enable extending it
+      // without changing the list we are reading from 
+      List<List<T>> extendedResult = new ArrayList<List<T>>();
+      
+      for(T listISuperNodeChoice : superNodeListI){
+        
+        for(List<T> partialList : result){
+          List<T> extendedPartialList = new ArrayList<T>(partialList);
+          extendedPartialList.add(listISuperNodeChoice);
+          extendedResult.add(extendedPartialList);
+        }
+      }
+      result = extendedResult;
+    }
+    return result;
+  }
+  
+  
   /**
    * This function performs the main work of decoding.
    * 
@@ -563,5 +636,18 @@ public class Chart {
     this.cells.get(i, j).addHyperEdgeInCell(
         new ComputeNodeResult(this.featureFunctions, rule, null, i, j, srcPath, segmentID), rule,
         i, j, null, srcPath, false);
+  }
+  
+  public static void main(String[] args){
+    List<String> list1 = Arrays.asList("a","b","c");
+    List<String> list2 = Arrays.asList("1","2","3");
+    List<String> list3 = Arrays.asList("red","green","blue");
+    List<List<String>> combinationsListPacked = Arrays.asList(list1,list2,list3);
+    
+    List<List<String>> result = unpackAllPossibleSuperNodeCombinations(combinationsListPacked);
+    for(List<String> unpackedList : result){
+      System.out.println("unpacked list: " + unpackedList);
+    }
+    
   }
 }

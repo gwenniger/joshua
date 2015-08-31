@@ -6,7 +6,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import org.junit.Assert;
+
 import joshua.corpus.Vocabulary;
+import joshua.decoder.chart_parser.DotNodeTypeCreater.DotNodeCreater;
 import joshua.decoder.ff.tm.Grammar;
 import joshua.decoder.ff.tm.Rule;
 import joshua.decoder.ff.tm.RuleCollection;
@@ -30,12 +34,12 @@ import joshua.util.ChartSpan;
  * used to group completed DotNodes over a span.
  * 
  * There is a separate DotChart for every grammar.
- * 
+ * DotNodeBase
  * @author Zhifei Li, <zhifei.work@gmail.com>
  * @author Matt Post <post@cs.jhu.edu>
  * @author Kristy Hollingshead Seitz
  */
-class DotChart {
+class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2> {
 
   // ===============================================================
   // Package-protected instance fields
@@ -44,9 +48,9 @@ class DotChart {
    * Two-dimensional chart of cells. Some cells might be null. This could definitely be represented
    * more efficiently, since only the upper half of this triangle is every used.
    */
-  private ChartSpan<DotCell> dotcells;
+  private ChartSpan<DotCell<T>> dotcells;
 
-  public DotCell getDotCell(int i, int j) {
+  public DotCell<T> getDotCell(int i, int j) {
     return dotcells.get(i, j);
   }
 
@@ -76,8 +80,11 @@ class DotChart {
    * nonTerminalMatcher determines the behavior of nonterminal matching: strict or soft-syntactic
    * matching
    */
-  private final NonterminalMatcher nonTerminalMatcher;
+  private final NonterminalMatcher<T> nonTerminalMatcher;
 
+  
+  // A DotNodeTypeCreater which takes care of using the right type of DotNodes,using strategy
+  private final DotNodeTypeCreater<T,T2> dotNodeTypeCreater;
 
   // ===============================================================
   // Static fields
@@ -105,15 +112,17 @@ class DotChart {
 
 
   public DotChart(Lattice<Integer> input, Grammar grammar, Chart chart,
-      NonterminalMatcher nonTerminalMatcher, boolean regExpMatching) {
+      NonterminalMatcher<T> nonTerminalMatcher, DotNodeTypeCreater<T,T2> dotNodeTypeCreater, 
+      boolean regExpMatching) {
 
     this.dotChart = chart;
     this.pGrammar = grammar;
     this.input = input;
     this.sentLen = input.size();
 
-    this.dotcells = new ChartSpan<DotCell>(sentLen, null);
+    this.dotcells = new ChartSpan<DotCell<T>>(sentLen, null);
     this.nonTerminalMatcher = nonTerminalMatcher;
+    this.dotNodeTypeCreater = dotNodeTypeCreater;
     this.regexpMatching = regExpMatching;
 
     // seeding the dotChart
@@ -200,7 +209,7 @@ class DotChart {
         // dotitem in dot_bins[i][k]: looking for an item in the right to the dot
 
 
-        for (DotNode dotNode : dotcells.get(i, j - 1).getDotNodes()) {
+        for (T dotNode : dotcells.get(i, j - 1).getDotNodes()) {
 
           // String arcWord = Vocabulary.word(last_word);
           // Assert.assertFalse(arcWord.endsWith("]"));
@@ -226,7 +235,7 @@ class DotChart {
           if (!(child_tnodes == null || child_tnodes.isEmpty())) {
             for (Trie child_tnode : child_tnodes) {
               if (null != child_tnode) {
-                addDotItem(child_tnode, i, j - 1 + arc_len, dotNode.antSuperNodes, null,
+                addDotItem(child_tnode, i, j - 1 + arc_len, dotNode.getAntSuperNodes(), null,
                     dotNode.srcPath.extend(arc));
 
 
@@ -248,6 +257,7 @@ class DotChart {
     extendDotItemsWithProvedItems(i, i, j, true);
   }
 
+  
   // ===============================================================
   // Private methods
   // ===============================================================
@@ -273,45 +283,79 @@ class DotChart {
     // complete super-items (items over the same span with different LHSs)
     List<SuperNode> superNodes = new ArrayList<SuperNode>(this.dotChart.getCell(k, j)
         .getSortedSuperItems().values());
+    
+    List<SuperNode> oovAndGoalSymbolSuperNodes = nonTerminalMatcher.getOOAndGoalLabelSuperNodeSubList(superNodes);
+    List<SuperNode> neitherOOVNorGoalSymbolSuperNodes = nonTerminalMatcher.getNeitherOOVNorGoalLabelSuperNodeSubList(oovAndGoalSymbolSuperNodes);
+    
+    
 
     /* For every partially complete item over (i,k) */
-    for (DotNode dotNode : dotcells.get(i, k).dotNodes) {
-      /* For every completed nonterminal in the main chart */
-      for (SuperNode superNode : superNodes) {
+    for (T dotNode : dotcells.get(i, k).dotNodes) {
+
+      // String arcWord = Vocabulary.word(superNode.lhs);
+      // logger.info("DotChart.extendDotItemsWithProvedItems: " + arcWord);
+      // Assert.assertTrue(arcWord.endsWith("]"));
+      // Assert.assertTrue(arcWord.startsWith("["));     
+      
+      if(nonTerminalMatcher.performFuzzyMatching()){
+        addEfficientMultiLabelDotItemsFuzzyMatching(i, j, neitherOOVNorGoalSymbolSuperNodes, dotNode, skipUnary);
+      }else{
+        addDotItemsBasic(i, j, neitherOOVNorGoalSymbolSuperNodes, dotNode, skipUnary);
+      }     
+      addDotItemsBasic(i, j, oovAndGoalSymbolSuperNodes, dotNode, skipUnary);            
+    }
+  }
+  
+  @SuppressWarnings("unchecked")
+  private void addEfficientMultiLabelDotItemsFuzzyMatching(int i, int j,List<SuperNode> neitherOOVNorGoalSymbolSuperNodes,T dotNode, boolean skipUnary){
+    /* For every completed nonterminal in the main chart */
+    
+    if(neitherOOVNorGoalSymbolSuperNodes.isEmpty()){
+      return;
+    }
+    // Here it does not really matter what supernode we use, since no matching is enforced, so we use the first 
+      SuperNode firstSuperNode = neitherOOVNorGoalSymbolSuperNodes.get(0); 
+
+      List<Trie> child_tnodes = nonTerminalMatcher.produceMatchingChildTNodesNonterminalLevel(
+          dotNode, firstSuperNode);
 
 
-        // String arcWord = Vocabulary.word(superNode.lhs);
-        // logger.info("DotChart.extendDotItemsWithProvedItems: " + arcWord);
-        // Assert.assertTrue(arcWord.endsWith("]"));
-        // Assert.assertTrue(arcWord.startsWith("["));
+      if (!child_tnodes.isEmpty()) {
 
 
-
-        /*
-         * Regular Expression matching allows for a regular-expression style rules in the grammar,
-         * which allows for a very primitive treatment of morphology. This is an advanced,
-         * undocumented feature that introduces a complexity, in that the next "word" in the grammar
-         * rule might match more than one outgoing arc in the grammar trie.
-         */
-        List<Trie> child_tnodes = nonTerminalMatcher.produceMatchingChildTNodesNonterminalLevel(
-            dotNode, superNode);
-
-
-        if (!child_tnodes.isEmpty()) {
-
-
-          for (Trie child_tnode : child_tnodes) {
-            if (child_tnode != null) {
-              if ((!skipUnary) || (child_tnode.hasExtensions())) {
-                addDotItem(child_tnode, i, j, dotNode.getAntSuperNodes(), superNode, dotNode
-                    .getSourcePath().extendNonTerminal());
-              }
+        for (Trie child_tnode : child_tnodes) {
+          if (child_tnode != null) {
+            if ((!skipUnary) || (child_tnode.hasExtensions())) {
+              addDotItem(child_tnode, i, j, dotNode.getAntSuperNodes(), (T2) neitherOOVNorGoalSymbolSuperNodes, dotNode
+                  .getSourcePath().extendNonTerminal());
             }
+          }
+        }
+      }               
+  }
+  
+  private void addDotItemsBasic(int i, int j,List<SuperNode> neitherOOVNorGoalSymbolSuperNodes,T dotNode, boolean skipUnary){
+  /* For every completed nonterminal in the main chart */
+  for (SuperNode superNode : neitherOOVNorGoalSymbolSuperNodes) {
+
+    List<Trie> child_tnodes = nonTerminalMatcher.produceMatchingChildTNodesNonterminalLevel(
+        dotNode, superNode);
+
+    if (!child_tnodes.isEmpty()) {
+
+      for (Trie child_tnode : child_tnodes) {
+        if (child_tnode != null) {
+          if ((!skipUnary) || (child_tnode.hasExtensions())) {
+            
+            addDotItem(child_tnode, i, j, dotNode.getAntSuperNodes(), (T2) superNode, dotNode
+                .getSourcePath().extendNonTerminal());
           }
         }
       }
     }
   }
+  }
+  
 
   /*
    * We introduced the ability to have regular expressions in rules for matching against terminals.
@@ -324,7 +368,7 @@ class DotChart {
    * expensive, which is why you should only enable regular expressions for small grammars.
    */
 
-  private ArrayList<Trie> matchAll(DotNode dotNode, int wordID) {
+  private ArrayList<Trie> matchAll(T dotNode, int wordID) {
     ArrayList<Trie> trieList = new ArrayList<Trie>();
     HashMap<Integer, ? extends Trie> childrenTbl = dotNode.trieNode.getChildren();
 
@@ -356,9 +400,9 @@ class DotChart {
    * @param curSuperNode the lefthand side of the rule being created
    * @param srcPath the path taken through the input lattice
    */
-  private void addDotItem(Trie tnode, int i, int j, List<SuperNode> antSuperNodesIn,
-      SuperNode curSuperNode, SourcePath srcPath) {
-    List<SuperNode> antSuperNodes = new ArrayList<SuperNode>();
+  private void addDotItem(Trie tnode, int i, int j, List<T2> antSuperNodesIn,
+      T2 curSuperNode, SourcePath srcPath) {
+    List<T2> antSuperNodes = new ArrayList<T2>();
     if (antSuperNodesIn != null) {
       antSuperNodes.addAll(antSuperNodesIn);
     }
@@ -366,9 +410,10 @@ class DotChart {
       antSuperNodes.add(curSuperNode);
     }
 
-    DotNode item = new DotNode(i, j, tnode, antSuperNodes, srcPath);
+    //DotNode item = new DotNode(i, j, tnode, antSuperNodes, srcPath);
+    T item = dotNodeTypeCreater.createDotNodeType(i, j, tnode, antSuperNodes, srcPath);
     if (dotcells.get(i, j) == null) {
-      dotcells.set(i, j, new DotCell());
+      dotcells.set(i, j, new DotCell<T>());
     }
     dotcells.get(i, j).addDotNode(item);
     dotChart.nDotitemAdded++;
@@ -387,6 +432,10 @@ class DotChart {
     }
   }
 
+  protected boolean performFuzzyMatching(){
+    return nonTerminalMatcher.performFuzzyMatching();
+  }
+  
   // ===============================================================
   // Package-protected classes
   // ===============================================================
@@ -396,16 +445,16 @@ class DotChart {
    * turn, is a partially-applied grammar rule, represented as a pointer into the grammar trie
    * structure.
    */
-  static class DotCell {
+  static class DotCell<T extends DotNodeBase> {
 
     // Package-protected fields
-    private List<DotNode> dotNodes = new ArrayList<DotNode>();
+    private List<T> dotNodes = new ArrayList<T>();
 
-    public List<DotNode> getDotNodes() {
+    public List<T> getDotNodes() {
       return dotNodes;
     }
 
-    private void addDotNode(DotNode dt) {
+    private void addDotNode(T dt) {
       /*
        * if(l_dot_items==null) l_dot_items= new ArrayList<DotItem>();
        */
@@ -417,7 +466,7 @@ class DotChart {
    * A DotNode represents the partial application of a rule rooted to a particular span (i,j). It
    * maintains a pointer to the trie node in the grammar for efficient mapping.
    */
-  static abstract class DotNodeBase {
+  static abstract class DotNodeBase<T> {
 
     // =======================================================
     // Package-protected instance fields
@@ -477,13 +526,16 @@ class DotChart {
     public SourcePath getSourcePath() {
       return srcPath;
     }
+    
+    public abstract List<T> getAntSuperNodes();
+      
   }
   
   /**
    * A DotNode represents the partial application of a rule rooted to a particular span (i,j). It
    * maintains a pointer to the trie node in the grammar for efficient mapping.
    */
-  static class DotNode extends DotNodeBase{
+  static class DotNode extends DotNodeBase<SuperNode>{
   
     private List<SuperNode> antSuperNodes = null; // pointer to SuperNode in Chart
     
@@ -502,7 +554,7 @@ class DotChart {
    * with fuzzy matching, compactly storing many DotItems that are identical,
    * except for their labels
    */
-  static class DotNodeMultiLabel extends DotNodeBase{    
+  static class DotNodeMultiLabel extends DotNodeBase<List<SuperNode>>{    
     private List<List<SuperNode>> antSuperNodeLists = null; 
     
     public DotNodeMultiLabel(int i, int j, Trie trieNode, List<List<SuperNode>> antSuperNodeLists, SourcePath srcPath) {
@@ -510,7 +562,7 @@ class DotChart {
       this.antSuperNodeLists = antSuperNodeLists;
     }
     
-    public List<List<SuperNode>> getAntSuperNodeLists() {
+    public List<List<SuperNode>> getAntSuperNodes() {
       return antSuperNodeLists;
     }
   }
