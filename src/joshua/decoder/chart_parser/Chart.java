@@ -307,6 +307,8 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
         if (null == rules || rules.size() <= 0)
           continue;
 
+        //logger.info("Gideon: Processing non-empty rule list in chart");
+        
         int arity = ruleCollection.getArity();
 
         // Rules that have no nonterminals in them so far
@@ -320,64 +322,33 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
           }
         } else {
 
+          //logger.info("Gideon: Processing non-empty rule list in chart with nonterminals");
           Rule bestRule = rules.get(0);
           
-          if(peformFuzzyMatching()){
+          if(peformFuzzyMatching()){                        
+            if(!(dotNode instanceof DotNodeMultiLabel)){
+              throw new RuntimeException("DotNode not instance of DotNodeMultiLabel!");
+            }            
             
             @SuppressWarnings("unchecked")
             List<List<SuperNode>> superNodes = (List<List<SuperNode>>) dotNode.getAntSuperNodes();
+            Assert.assertFalse(superNodes.isEmpty());
+            //logger.info("superNodes.get(0).size();" +superNodes.get(0).size()); 
             
-            List<List<SuperNode>>   unpackedSuperNodeLists =  unpackAllPossibleSuperNodeCombinations(superNodes);
+            List<List<SuperNode>>   unpackedSuperNodeLists =  unpackAllPossibleTCombinations(superNodes);
             Assert.assertFalse(unpackedSuperNodeLists.isEmpty());
-            for(List<SuperNode> unpackedSuperNodeList : unpackedSuperNodeLists){              
-              List<HGNode> currentAntNodes = new ArrayList<HGNode>();
-              
-              for (SuperNode si : unpackedSuperNodeList) {
-                // TODO: si.nodes must be sorted
-                currentAntNodes.add(si.nodes.get(0));
-              }
-
-              ComputeNodeResult result = new ComputeNodeResult(featureFunctions, bestRule,
-                  currentAntNodes, i, j, sourcePath, this.segmentID);
-
-              int[] ranks = new int[1 + unpackedSuperNodeList.size()];
-              for (int r = 0; r < ranks.length; r++)
-                ranks[r] = 1;
-
-              CubePruneState bestState = new CubePruneState(result, ranks, rules, currentAntNodes);
-
-              DotNodeMultiLabel castDotNodeMultiLabel = (DotNodeMultiLabel) dotNode;
-              DotNode basicDotNode = new DotNode(i, j, castDotNodeMultiLabel.getTrieNode(), unpackedSuperNodeList, castDotNodeMultiLabel.getSourcePath());
-              bestState.setDotNode(basicDotNode);
-              candidates.add(bestState);
-              visitedStates.add(bestState);
-  
-            }
             
+            //logger.info(" Looping over unpackedSuperNodeList");
+            for(List<SuperNode> unpackedSuperNodeList : unpackedSuperNodeLists){                                                   
+              Assert.assertEquals(superNodes.size(),unpackedSuperNodeList.size());
+              addNewCubePruneState(i, j, rules, dotNode, bestRule,unpackedSuperNodeList, arity, sourcePath, candidates, visitedStates);           
+            }            
           }
           else{
-            // No fuzzy matching
-            List<HGNode> currentAntNodes = new ArrayList<HGNode>();
+         
             @SuppressWarnings("unchecked")
-            List<SuperNode> superNodes = (List<SuperNode>) dotNode.getAntSuperNodes();
-            for (SuperNode si : superNodes) {
-              // TODO: si.nodes must be sorted
-              currentAntNodes.add(si.nodes.get(0));
-            }
-
-            ComputeNodeResult result = new ComputeNodeResult(featureFunctions, bestRule,
-                currentAntNodes, i, j, sourcePath, this.segmentID);
-
-            int[] ranks = new int[1 + superNodes.size()];
-            for (int r = 0; r < ranks.length; r++)
-              ranks[r] = 1;
-
-            CubePruneState bestState = new CubePruneState(result, ranks, rules, currentAntNodes);
-
-            DotNode dotNodeCasted = (DotNode) dotNode;
-            bestState.setDotNode(dotNodeCasted);
-            candidates.add(bestState);
-            visitedStates.add(bestState);
+            List<SuperNode> superNodes = (List<SuperNode>) dotNode.getAntSuperNodes();         
+            addNewCubePruneState(i, j, rules, dotNode, bestRule,superNodes, arity, sourcePath, candidates, visitedStates);
             
           }
         }
@@ -442,31 +413,86 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
     }
   }
 
+  private void addNewCubePruneState(int i, int j,  List<Rule> rules, T dotNode,  Rule bestRule,
+      List<SuperNode> unpackedSuperNodeList, int arity,SourcePath sourcePath,
+      PriorityQueue<CubePruneState> candidates, HashSet<CubePruneState> visitedStates ){
+    List<HGNode> currentAntNodes = new ArrayList<HGNode>();
+    //Assert.assertEquals(superNodes.size(),unpackedSuperNodeList.size());
+    
+    for (SuperNode si : unpackedSuperNodeList) {
+      // TODO: si.nodes must be sorted
+      currentAntNodes.add(si.nodes.get(0));
+    }
+
+    ComputeNodeResult result = new ComputeNodeResult(featureFunctions, bestRule,
+        currentAntNodes, i, j, sourcePath, this.segmentID);
+
+    int[] ranks = computeRanks(unpackedSuperNodeList);;
+
+    CubePruneState bestState = new CubePruneState(result, ranks, rules, currentAntNodes);
+
+    //logger.info(" Create new CubePruneState");
+                 
+    DotNode basicDotNode = castOrCreateNewDotNode(dotNode, arity, j,unpackedSuperNodeList);
+    bestState.setDotNode(basicDotNode);
+    candidates.add(bestState);
+    visitedStates.add(bestState);
+  }
+  
+  private DotNode castOrCreateNewDotNode(T dotNode,int i, int j,List<SuperNode> superNodes){
+    if(peformFuzzyMatching()){
+        DotNodeMultiLabel castDotNodeMultiLabel = (DotNodeMultiLabel) dotNode;
+        DotNode basicDotNode = new DotNode(i, j, castDotNodeMultiLabel.getTrieNode(), superNodes, castDotNodeMultiLabel.getSourcePath());
+        return basicDotNode;      
+    }
+    else{
+      return (DotNode) dotNode;
+    }
+  }
+  
+  private int[] computeRanks(List<SuperNode> superNodes ){
+    int[] ranks = new int[1 + superNodes.size()];
+    for (int r = 0; r < ranks.length; r++){
+      ranks[r] = 1;
+    }
+    return ranks;
+  }
+  
+  
   private boolean peformFuzzyMatching(){
     return this.dotcharts[0].performFuzzyMatching();
   }
   
-  private static final <T> List<List<T>> unpackAllPossibleSuperNodeCombinations(List<List<T>> listOfSuperNodesLists){
-    List<List<T>> result = new ArrayList<List<T>>();
-    
-    for(List<T> superNodeListI : listOfSuperNodesLists){
-      // We make a temporary copy of the list to enable extending it
-      // without changing the list we are reading from 
-      List<List<T>> extendedResult = new ArrayList<List<T>>();
-      
-      for(T listISuperNodeChoice : superNodeListI){
-        
-        for(List<T> partialList : result){
-          List<T> extendedPartialList = new ArrayList<T>(partialList);
-          extendedPartialList.add(listISuperNodeChoice);
-          extendedResult.add(extendedPartialList);
-        }
-      }
-      result = extendedResult;
-    }
-    return result;
-  }
+  private static final <T> List<List<T>> unpackAllPossibleTCombinations(List<List<T>> listOfLists) {
+      List<List<T>> result = new ArrayList<List<T>>();
   
+      // We need to initially add one empty list to the result for iterative
+      // extending
+      result.add(new ArrayList<T>());
+  
+      if (!(listOfLists instanceof List)) {
+          throw new RuntimeException("Gideon: Not a list!");
+      }
+  
+      for (int i = 0; i < listOfLists.size(); i++) {
+    
+            List<T> superNodeListI = listOfLists.get(i);
+    
+            // We make a temporary copy of the list to enable extending it
+            // without changing the list we are reading from
+            List<List<T>> extendedResult = new ArrayList<List<T>>();
+    
+          for (T listITChoice : superNodeListI) {      
+            for (List<T> partialList : result) {
+                List<T> extendedPartialList = new ArrayList<T>(partialList);
+                extendedPartialList.add(listITChoice);
+                extendedResult.add(extendedPartialList);
+            }
+          }
+            result = extendedResult;
+      }
+      return result;
+    }
   
   /**
    * This function performs the main work of decoding.
@@ -636,18 +662,5 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
     this.cells.get(i, j).addHyperEdgeInCell(
         new ComputeNodeResult(this.featureFunctions, rule, null, i, j, srcPath, segmentID), rule,
         i, j, null, srcPath, false);
-  }
-  
-  public static void main(String[] args){
-    List<String> list1 = Arrays.asList("a","b","c");
-    List<String> list2 = Arrays.asList("1","2","3");
-    List<String> list3 = Arrays.asList("red","green","blue");
-    List<List<String>> combinationsListPacked = Arrays.asList(list1,list2,list3);
-    
-    List<List<String>> result = unpackAllPossibleSuperNodeCombinations(combinationsListPacked);
-    for(List<String> unpackedList : result){
-      System.out.println("unpacked list: " + unpackedList);
-    }
-    
   }
 }

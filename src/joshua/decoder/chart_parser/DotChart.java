@@ -285,7 +285,7 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
         .getSortedSuperItems().values());
     
     List<SuperNode> oovAndGoalSymbolSuperNodes = nonTerminalMatcher.getOOAndGoalLabelSuperNodeSubList(superNodes);
-    List<SuperNode> neitherOOVNorGoalSymbolSuperNodes = nonTerminalMatcher.getNeitherOOVNorGoalLabelSuperNodeSubList(oovAndGoalSymbolSuperNodes);
+    List<SuperNode> neitherOOVNorGoalSymbolSuperNodes = nonTerminalMatcher.getNeitherOOVNorGoalLabelSuperNodeSubList(superNodes);
     
     
 
@@ -298,11 +298,14 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
       // Assert.assertTrue(arcWord.startsWith("["));     
       
       if(nonTerminalMatcher.performFuzzyMatching()){
+        //logger.info(" addEfficientMultiLabelDotItemsFuzzyMatching (1a)");
         addEfficientMultiLabelDotItemsFuzzyMatching(i, j, neitherOOVNorGoalSymbolSuperNodes, dotNode, skipUnary);
       }else{
         addDotItemsBasic(i, j, neitherOOVNorGoalSymbolSuperNodes, dotNode, skipUnary);
+        //logger.info("  addDotItemsBasic(i, j, neitherOOVNorGoalSymbolSuperNodes, dotNode, skipUnary) (1b)");
       }     
-      addDotItemsBasic(i, j, oovAndGoalSymbolSuperNodes, dotNode, skipUnary);            
+      addDotItemsBasic(i, j, oovAndGoalSymbolSuperNodes, dotNode, skipUnary);
+      //logger.info(" addDotItemsBasic(i, j, oovAndGoalSymbolSuperNodes, dotNode, skipUnary) (2)");
     }
   }
   
@@ -311,6 +314,7 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
     /* For every completed nonterminal in the main chart */
     
     if(neitherOOVNorGoalSymbolSuperNodes.isEmpty()){
+      //logger.info("Gideon:  neitherOOVNorGoalSymbolSuperNodes.isEmpty() :(");
       return;
     }
     // Here it does not really matter what supernode we use, since no matching is enforced, so we use the first 
@@ -323,9 +327,12 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
       if (!child_tnodes.isEmpty()) {
 
 
+        //logger.info("Gideon: looping over childe_tnodes");
         for (Trie child_tnode : child_tnodes) {
           if (child_tnode != null) {
             if ((!skipUnary) || (child_tnode.hasExtensions())) {
+              
+              //logger.info("Gideon: addDotItem for nonterminal!!!");
               addDotItem(child_tnode, i, j, dotNode.getAntSuperNodes(), (T2) neitherOOVNorGoalSymbolSuperNodes, dotNode
                   .getSourcePath().extendNonTerminal());
             }
@@ -347,7 +354,7 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
         if (child_tnode != null) {
           if ((!skipUnary) || (child_tnode.hasExtensions())) {
             
-            addDotItem(child_tnode, i, j, dotNode.getAntSuperNodes(), (T2) superNode, dotNode
+            addDotItem(child_tnode, i, j, dotNode.getAntSuperNodes(),dotNodeTypeCreater.createSuperNodeTypeFromSingleSuperNode(superNode), dotNode
                 .getSourcePath().extendNonTerminal());
           }
         }
@@ -445,7 +452,7 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
    * turn, is a partially-applied grammar rule, represented as a pointer into the grammar trie
    * structure.
    */
-  static class DotCell<T extends DotNodeBase> {
+  static class DotCell<T extends DotNodeBase<?>> {
 
     // Package-protected fields
     private List<T> dotNodes = new ArrayList<T>();
@@ -543,10 +550,13 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
       super(i,j,trieNode,srcPath);
       this.antSuperNodes = antSuperNodes;
     }
-    
+
+    @Override
     public List<SuperNode> getAntSuperNodes() {
-      return antSuperNodes;
-    }    
+        return antSuperNodes;
+    }
+    
+  
   }
   
   /**
@@ -561,10 +571,13 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
       super(i,j,trieNode,srcPath);
       this.antSuperNodeLists = antSuperNodeLists;
     }
-    
+
+    @Override
     public List<List<SuperNode>> getAntSuperNodes() {
       return antSuperNodeLists;
     }
+    
+ 
   }
 
 }
