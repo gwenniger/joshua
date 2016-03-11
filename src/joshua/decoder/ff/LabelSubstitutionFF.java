@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import org.junit.Assert;
+
 import joshua.decoder.JoshuaConfiguration;
 import joshua.decoder.chart_parser.NonterminalMatcher;
 import joshua.decoder.chart_parser.SourcePath;
@@ -140,6 +142,70 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
     return "<" + tag + ">";
   }  
   
+  public static String getLHSTagStartString(){
+    return startTagString(SPARSE_FEATURE_LHS_TAG);
+  }
+  
+  public static String getLHSTagEndString(){
+    return closeTagString(SPARSE_FEATURE_LHS_TAG);
+  }
+
+  public static String getNonterminalsTagStartString(){
+    return startTagString(SPARSE_FEATURE_NONTERMINALS_TAG);
+  }
+  
+  public static String getNonterminalsTagEndString(){
+    return closeTagString(SPARSE_FEATURE_NONTERMINALS_TAG);
+  }
+
+  public static String getSubstitutedToTagStartString(){
+    return startTagString(SPARSE_FEATURE_SUBST_TAG);
+  }
+  
+  public static String getSubstitutedToTagEndString(){
+    return closeTagString(SPARSE_FEATURE_SUBST_TAG);
+  }
+  
+  private static String getSparseFeaturePropertyFromFeatureString(String sparseFeatureString, String propertyString){
+      String startTagString = startTagString(propertyString);
+      String endTagString = closeTagString(propertyString);
+      int subStringStartIndex = sparseFeatureString.indexOf(startTagString) + startTagString.length();
+      int subStringEndIndex = sparseFeatureString.indexOf(endTagString);
+            
+      String result = sparseFeatureString.substring(subStringStartIndex,subStringEndIndex);
+      return result;
+  }
+  
+  public static String getLeftHandSideFromSparseFeatureString(String sparseFeatureString){
+    return getSparseFeaturePropertyFromFeatureString(sparseFeatureString, SPARSE_FEATURE_LHS_TAG);
+  }
+  
+  public static List<String> geRuleNonterminalsFromSparseFeatureString(String sparseFeatureString){
+    String propertyString = getSparseFeaturePropertyFromFeatureString(sparseFeatureString, SPARSE_FEATURE_NONTERMINALS_TAG);
+    String[] nonterminalsArray = propertyString.split(",");
+    return Arrays.asList(nonterminalsArray);
+  }
+  
+  public static List<String> geRuleSubstitutedToLabelsFromSparseFeatureString(String sparseFeatureString){
+    String propertyString = getSparseFeaturePropertyFromFeatureString(sparseFeatureString, SPARSE_FEATURE_SUBST_TAG);
+    String[] nonterminalsArray = propertyString.split(",");
+    return Arrays.asList(nonterminalsArray);
+  }
+  
+  public static boolean geRuleOrientationIsInvertedFromSparseFeatureString(String sparseFeatureString){
+    String startTagString = closeTagString(SPARSE_FEATURE_NONTERMINALS_TAG) + "_";
+    String endTagString = "_" + startTagString(SPARSE_FEATURE_SUBST_TAG);
+    int subStringStartIndex = sparseFeatureString.indexOf(startTagString) + startTagString.length();
+    int subStringEndIndex = sparseFeatureString.indexOf(endTagString);
+          
+    String orientationString = sparseFeatureString.substring(subStringStartIndex,subStringEndIndex);  
+    Assert.assertTrue(orientationString.equals(INVERTED_TAG) || orientationString.equals(MONOTONE_TAG));
+    if(orientationString.equals(INVERTED_TAG)){
+      return true;
+    }
+    return false;
+  }
+  
   private static final String getRuleLabelsDescriptorString(Rule rule,
       LabelSubstitutionLabelSmoother labelSubstitutionLabelSmoother) {
     String result = "";
@@ -150,12 +216,12 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
         ruleSourceNonterminals, labelSubstitutionLabelSmoother);
 
     boolean isInverting = rule.isInverting();
-    result += startTagString(SPARSE_FEATURE_LHS_TAG) + labelSubstitutionLabelSmoother.getSmoothedLabelString(leftHandSide)
-        + closeTagString(SPARSE_FEATURE_LHS_TAG);
-    result += "_" + startTagString(SPARSE_FEATURE_NONTERMINALS_TAG);
+    result += getLHSTagStartString() + labelSubstitutionLabelSmoother.getSmoothedLabelString(leftHandSide)
+        + getLHSTagEndString();
+    result += "_" + getNonterminalsTagStartString();
     result += ListUtil
         .stringListStringWithoutBracketsCommaSeparated(labelSmoothedSourceNonterminals);
-    result += closeTagString(SPARSE_FEATURE_NONTERMINALS_TAG);
+    result += getNonterminalsTagEndString();
     if (isInverting) {
       result += "_" + INVERTED_TAG;
     } else {
@@ -167,14 +233,14 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
 
   private static final String getSubstitutionsDescriptorString(List<HGNode> tailNodes,
       LabelSubstitutionLabelSmoother labelSubstitutionLabelSmoother) {
-    String result = "_" + startTagString(SPARSE_FEATURE_SUBST_TAG);
+    String result = "_" + getSubstitutedToTagStartString();
     List<String> substitutionNonterminals = RulePropertiesQuerying
         .getSourceNonterminalStrings(tailNodes);
     List<String> smoothedSubstitutionLabelsList = getLabelSmoothedLabelsList(
         substitutionNonterminals, labelSubstitutionLabelSmoother);
     result += ListUtil
         .stringListStringWithoutBracketsCommaSeparated(smoothedSubstitutionLabelsList);
-    result += closeTagString(SPARSE_FEATURE_SUBST_TAG);
+    result += getSubstitutedToTagEndString();
     return result;
   }
 
