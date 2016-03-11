@@ -5,6 +5,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.junit.Assert;
+
 /**
  * This class stores predictions for LabelSubstitionFeatures for all possible <rule labels, gap
  * labels> combinations that are possible, given the nonterminal labels existing in the grammar.
@@ -70,39 +72,6 @@ public class LabelSubstitutionFFValuePrediction {
     }
   }
 
-  /**
-   * This class will enumerate all LabelSubstitutionCombinations
-   * 
-   * @author gemaille
-   * 
-   */
-  public static class LabelSubstituionCombinationEnumeration implements
-      Enumeration<LabelSubstitutionCombination> {
-
-    private final int numberOfLabels;
-    private List<Integer> nextElementRuleSourceNonterminalNumbers;
-    private List<Integer> nextElementSubstitutedNonterminalNumbers;
-
-    private LabelSubstituionCombinationEnumeration(int numberOfLabels,
-        List<Integer> nextElementRuleSourceNonterminalNumbers,
-        List<Integer> nextElementSubstitutedNonterminalNumbers) {
-      this.numberOfLabels = numberOfLabels;
-      this.nextElementSubstitutedNonterminalNumbers = nextElementSubstitutedNonterminalNumbers;
-      this.nextElementRuleSourceNonterminalNumbers = nextElementRuleSourceNonterminalNumbers;
-    }
-
-    @Override
-    public boolean hasMoreElements() {
-      // TODO Auto-generated method stub
-      return false;
-    }
-
-    @Override
-    public LabelSubstitutionCombination nextElement() {
-      // TODO Auto-generated method stub
-      return null;
-    }
-
-  }
+ 
 
 }

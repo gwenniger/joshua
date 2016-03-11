@@ -13,12 +13,18 @@ import joshua.decoder.hypergraph.HGNode;
 import joshua.util.ListUtil;
 
 public abstract class LabelSubstitutionFF extends StatelessFF {
+  private static final String MONOTONE_TAG = "MONO";
+  private static final String INVERTED_TAG = "INV";
+  private static final String BASIC_FEATURE_SUBSTITUTES_INFIX = "_substitutes_";
   private static final String STANDARD_LABEL_SUBSTITUTION_BASIC_FEATURE_FUNCTION_NAME = "LabelSubstitution";
   private static final String STANDARD_LABEL_SUBSTITUTION_SPARSE_FEATURE_FUNCTION_NAME = "LabelSubstitutionSparse";
   private static final String DOUBLE_LABEL_SMOOTHED_LABEL_SUBSTITUTION_BASIC_FEATURE_FUNCTION_NAME = "LabelSubstitutionDoubleLabel";
   private static final String DOUBLE_LABEL_SMOOTHED_LABEL_SUBSTITUTION_SPARSE_FEATURE_FUNCTION_NAME = "LabelSubstitutionDoubleLabelSparse";
   private static final String MATCH_SUFFIX = "MATCH";
   private static final String NO_MATCH_SUFFIX = "NOMATCH";
+  private static final String SPARSE_FEATURE_LHS_TAG = "Nont";
+  private static final String SPARSE_FEATURE_NONTERMINALS_TAG = "Nont";
+  private static final String SPARSE_FEATURE_SUBST_TAG = "Subst";
 
   private static final String FUZZY_MATCHING_GLUE_GRAMMAR_NONTERIMINAL = "[X]";
 
@@ -96,7 +102,7 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
   }
 
   public static String getSubstitutionSuffix(String ruleLabel, String substitutionLabel) {
-    return substitutionLabel + "_substitutes_" + ruleLabel;
+    return substitutionLabel + BASIC_FEATURE_SUBSTITUTES_INFIX + ruleLabel;
   }
 
   private final String computeLabelMatchingFeature(String ruleNonterminal,
@@ -126,6 +132,14 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
     return result;
   }
 
+  
+  private static String startTagString(String tag){
+    return "<" + tag + ">";
+  }
+  private static String closeTagString(String tag){
+    return "<" + tag + ">";
+  }  
+  
   private static final String getRuleLabelsDescriptorString(Rule rule,
       LabelSubstitutionLabelSmoother labelSubstitutionLabelSmoother) {
     String result = "";
@@ -136,16 +150,16 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
         ruleSourceNonterminals, labelSubstitutionLabelSmoother);
 
     boolean isInverting = rule.isInverting();
-    result += "<LHS>" + labelSubstitutionLabelSmoother.getSmoothedLabelString(leftHandSide)
-        + "</LHS>";
-    result += "_<Nont>";
+    result += startTagString(SPARSE_FEATURE_LHS_TAG) + labelSubstitutionLabelSmoother.getSmoothedLabelString(leftHandSide)
+        + closeTagString(SPARSE_FEATURE_LHS_TAG);
+    result += "_" + startTagString(SPARSE_FEATURE_NONTERMINALS_TAG);
     result += ListUtil
         .stringListStringWithoutBracketsCommaSeparated(labelSmoothedSourceNonterminals);
-    result += "</Nont>";
+    result += closeTagString(SPARSE_FEATURE_NONTERMINALS_TAG);
     if (isInverting) {
-      result += "_INV";
+      result += "_" + INVERTED_TAG;
     } else {
-      result += "_MONO";
+      result += "_" + MONOTONE_TAG;
     }
 
     return result;
@@ -153,14 +167,14 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
 
   private static final String getSubstitutionsDescriptorString(List<HGNode> tailNodes,
       LabelSubstitutionLabelSmoother labelSubstitutionLabelSmoother) {
-    String result = "_<Subst>";
+    String result = "_" + startTagString(SPARSE_FEATURE_SUBST_TAG);
     List<String> substitutionNonterminals = RulePropertiesQuerying
         .getSourceNonterminalStrings(tailNodes);
     List<String> smoothedSubstitutionLabelsList = getLabelSmoothedLabelsList(
         substitutionNonterminals, labelSubstitutionLabelSmoother);
     result += ListUtil
         .stringListStringWithoutBracketsCommaSeparated(smoothedSubstitutionLabelsList);
-    result += "</Subst>";
+    result += closeTagString(SPARSE_FEATURE_SUBST_TAG);
     return result;
   }
 
@@ -279,7 +293,54 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
     }
     return null;
   }
+  
+  /**
+   * This method computes the score for this feature type only.
+   * This is useful for prediction as needed for optimization of addition of 
+   * candidates during cube pruning, when working with fuzzy matching.
+   *  
+   * @param rule
+   * @param tailNodes
+   * @param i
+   * @param j
+   * @param sourcePath
+   * @param sentID
+   * @return
+   */
+  public double computeScoreThisFeatureOnly(Rule rule, List<HGNode> tailNodes, int i, int j, SourcePath sourcePath,
+      int sentID){
+    ScoreAccumulator scoreAccumulator = new ScoreAccumulator();
+    compute(rule, tailNodes, i, j, sourcePath, sentID, scoreAccumulator);
+    return scoreAccumulator.getScore();
+  }
+  
+  public static String getMatchFeatureSuffix(){
+    return MATCH_SUFFIX;
+  }
+  
+  public static String getNoMatchFeatureSuffix(){
+    return NO_MATCH_SUFFIX;
+  }
+  
+  public static boolean isBasicLabelSubstitutionFeatureString(String featureString){
+    return featureString.contains(BASIC_FEATURE_SUBSTITUTES_INFIX);
+  }
 
+  public static boolean isSparseLabelSubstitutionFeatureString(String featureString){
+    return featureString.contains(startTagString(SPARSE_FEATURE_LHS_TAG)) &&
+        featureString.contains(closeTagString(SPARSE_FEATURE_LHS_TAG)) &&
+        featureString.contains(startTagString(SPARSE_FEATURE_NONTERMINALS_TAG)) &&
+        featureString.contains(closeTagString(SPARSE_FEATURE_NONTERMINALS_TAG)) &&
+        featureString.contains(startTagString(SPARSE_FEATURE_SUBST_TAG)) &&
+        featureString.contains(closeTagString(SPARSE_FEATURE_SUBST_TAG));
+  }
+  
+  
+  public static String getBasicLabelSubstitutionFeatureSubstitutionInfix(){
+    return BASIC_FEATURE_SUBSTITUTES_INFIX;
+  }
+
+  
   private static class LabelSubstitutionBasicFF extends LabelSubstitutionFF {
     private LabelSubstitutionBasicFF(FeatureVector weights, String name,
         JoshuaConfiguration joshuaConfiguration,
