@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.logging.Logger;
 
 import joshua.decoder.ff.StatefulFF;
+import joshua.decoder.ff.featureScorePrediction.FeatureScorePredictor;
 import joshua.util.Regex;
 import joshua.util.io.LineReader;
 
@@ -139,7 +140,10 @@ public class JoshuaConfiguration {
   public boolean fuzzy_matching = false;
   public static final String SOFT_SYNTACTIC_CONSTRAINT_DECODING_PROPERTY_NAME = "fuzzy_matching";
   
-
+  /* Feature score predictor for label substitution features*/
+  public FeatureScorePredictor featureScorePredictor; 
+  
+  
   /**
    * This method resets the state of JoshuaConfiguration back to the state after initialization.
    * This is useful when for example making different calls to the decoder within the same java

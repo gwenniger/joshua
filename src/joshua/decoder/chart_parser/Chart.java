@@ -335,6 +335,19 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
             Assert.assertFalse(superNodes.isEmpty());
             //logger.info("superNodes.get(0).size();" +superNodes.get(0).size()); 
             
+            List<SuperNode> firstLabelCombination = unpackFirstCombination(superNodes);
+            //TODO
+            // 1: Compute the feature weight for the first label combination
+            // 2. Compute the maximum possible feature weight across labeled variants
+            // of the same rule based on joshuaConfiguration.featureScorePredictor
+            // 3. Compute the position in the queue for the hypothetical maximum 
+            //    scoring labeled variant.
+            // 4. If the best achievable position in the queue for the hypothetical
+            //    maximum scoring labeled variant is beyond POP_LIMIT, then non          
+            //    of the labeled variants will ever be added to the chart in the next step
+            //    so we can safely discard the whole set to save considerable computation.
+            
+            
             List<List<SuperNode>>   unpackedSuperNodeLists =  unpackAllPossibleTCombinations(superNodes);
             Assert.assertFalse(unpackedSuperNodeLists.isEmpty());
             
@@ -462,6 +475,15 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
   private boolean peformFuzzyMatching(){
     return this.dotcharts[0].performFuzzyMatching();
   }
+  
+  private static final <T> List<T> unpackFirstCombination(List<List<T>> listOfLists) {
+    List<T> result = new ArrayList<T>();
+    for(List<T> optionsList : listOfLists){
+      result.add(optionsList.get(0));
+    }
+    return result;
+  }
+   
   
   private static final <T> List<List<T>> unpackAllPossibleTCombinations(List<List<T>> listOfLists) {
       List<List<T>> result = new ArrayList<List<T>>();

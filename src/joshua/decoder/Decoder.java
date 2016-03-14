@@ -79,10 +79,7 @@ public class Decoder {
 
   /* The feature weights. */
   public static FeatureVector weights;
-  
-  /* Feature score predictor for label substitution features*/
-  public static FeatureScorePredictor featureScorePredictor; 
-  
+    
 
   /** Logger for this class. */
   private static final Logger logger = Logger.getLogger(Decoder.class.getName());
@@ -701,8 +698,8 @@ public class Decoder {
       else if(LabelSubstitutionFFAndFFPredictionCreater.isRelevantFeatureName(feature)){
         this.featureFunctions.add(LabelSubstitutionFFAndFFPredictionCreater.createLabelSubstitutionFFForFeatureName(feature, weights, joshuaConfiguration));
         logger.info("Creating feature score predictor");
-        Decoder.featureScorePredictor = LabelSubstitutionFFAndFFPredictionCreater.createLightWeightLabelSubstitutionFeatureScorePredictorForFeatureName(feature, weights, joshuaConfiguration);
-        logger.info("Created feature score predictor" + Decoder.featureScorePredictor);
+        joshuaConfiguration.featureScorePredictor = LabelSubstitutionFFAndFFPredictionCreater.createLightWeightLabelSubstitutionFeatureScorePredictorForFeatureName(feature, weights, joshuaConfiguration);
+        logger.info("Created feature score predictor" + joshuaConfiguration.featureScorePredictor);
       }
       
       else {
