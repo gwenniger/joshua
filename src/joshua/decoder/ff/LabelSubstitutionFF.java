@@ -24,7 +24,7 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
   private static final String DOUBLE_LABEL_SMOOTHED_LABEL_SUBSTITUTION_SPARSE_FEATURE_FUNCTION_NAME = "LabelSubstitutionDoubleLabelSparse";
   private static final String MATCH_SUFFIX = "MATCH";
   private static final String NO_MATCH_SUFFIX = "NOMATCH";
-  private static final String SPARSE_FEATURE_LHS_TAG = "Nont";
+  private static final String SPARSE_FEATURE_LHS_TAG = "LHS";
   private static final String SPARSE_FEATURE_NONTERMINALS_TAG = "Nont";
   private static final String SPARSE_FEATURE_SUBST_TAG = "Subst";
   private static final String DOUBLE_LABEL_SEPARATOR = "<<>>";
@@ -155,7 +155,7 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
   }
 
   private static String closeTagString(String tag) {
-    return "<" + tag + ">";
+    return "</" + tag + ">";
   }
 
   public static String getLHSTagStartString() {

@@ -33,13 +33,22 @@ public class LabelMatchingFeatureScorePredictor  {
   }
 
   private static float getMatchScore(String featureTypePrefix, FeatureVector featureVector) {
-    Assert.assertTrue(featureVector.containsKey(getMatchFeatureString(featureTypePrefix)));
-    return featureVector.get(getMatchFeatureString(featureTypePrefix));
+    // It is possible that the match feature has no weight yet, and this is even certain 
+    // to be the case at the first tuning iteration
+    if(featureVector.containsKey(getMatchFeatureString(featureTypePrefix))){
+      return featureVector.get(getMatchFeatureString(featureTypePrefix));  
+    }
+    return 0;
+    
   }
 
   private static float getNoMatchScore(String featureTypePrefix, FeatureVector featureVector) {
-    Assert.assertTrue(featureVector.containsKey(getNoMatchFeatureString(featureTypePrefix)));
-    return featureVector.get(getNoMatchFeatureString(featureTypePrefix));
+    // It is possible that the match feature has no weight yet, and this is even certain 
+    // to be the case at the first tuning iteration
+    if(featureVector.containsKey(getNoMatchFeatureString(featureTypePrefix))){
+      return featureVector.get(getNoMatchFeatureString(featureTypePrefix));  
+    }
+    return 0;
   }
 
   public float getNoMatchScore() {

@@ -24,15 +24,18 @@ public class SparseSubstitutionDescription {
     this.leftHandSideLabel = ruleLeftHandSideLabel;
     this.ruleNonterminalLabels = ruleNonterminalLabels;
     this.substitutedToLabels = substitutedToLabels;
+    Assert.assertEquals(ruleNonterminalLabels.size(), substitutedToLabels.size());
   }
 
   protected static SparseSubstitutionDescription creatSparseSubstitutionDescription(
       String featureTypePrefix, String sparseFeatureString) {
+
+    System.err.println("sparse feature String: " + sparseFeatureString);
+
     String featureSubstring = sparseFeatureString.substring(sparseFeatureString
         .indexOf(featureTypePrefix) + featureTypePrefix.length());
-    String[] parts = featureSubstring.split(LabelSubstitutionFF
-        .getBasicLabelSubstitutionFeatureSubstitutionInfix());
-    Assert.assertEquals(2, parts.length);
+
+    System.err.println("feature substring: " + featureSubstring);
 
     boolean ruleIsInverted = LabelSubstitutionFF
         .geRuleOrientationIsInvertedFromSparseFeatureString(sparseFeatureString);
@@ -45,10 +48,24 @@ public class SparseSubstitutionDescription {
 
     // substitutedToLabels
 
-    Assert.assertEquals(ruleNonterminalLabels.size(), substitutedToLabels.size());
-
     return new SparseSubstitutionDescription(ruleIsInverted, ruleLeftHandSideLabel,
         ruleNonterminalLabels, substitutedToLabels);
+  }
+
+  /**
+   * Compute the label smoothed version of a list of labels, typically selecting only
+   * the first or second half of a double label 
+   * @param labelSubstitutionLabelSmoother
+   * @param unsmoothedLabels
+   * @return
+   */
+  private List<String> getLabelSmoothedLabels(
+      LabelSubstitutionLabelSmoother labelSubstitutionLabelSmoother, List<String> unsmoothedLabels) {
+    List<String> result = new ArrayList<String>();
+    for (String ruleNonTerminalLabel : unsmoothedLabels) {
+      result.add(labelSubstitutionLabelSmoother.getSmoothedLabelString(ruleNonTerminalLabel));
+    }
+    return result;
   }
 
   private SparseSubstitutionDescription getOneLabelOnlySparseSubstitutionDescription(
@@ -56,17 +73,12 @@ public class SparseSubstitutionDescription {
 
     String leftHandSideLabelFirstLabelOnly = labelSubstitutionLabelSmoother
         .getSmoothedLabelString(leftHandSideLabel);
-    List<String> ruleNonterminalLabelsFirstOnly = new ArrayList<String>();
-    for (String ruleNonTerminalLabel : this.ruleNonterminalLabels) {
-      ruleNonterminalLabelsFirstOnly.add(labelSubstitutionLabelSmoother
-          .getSmoothedLabelString(ruleNonTerminalLabel));
-    }
-    List<String> ruleSubstitutedToLabelsFirstOnly = new ArrayList<String>();
 
-    for (String substitutedToLabel : this.substitutedToLabels) {
-      ruleNonterminalLabelsFirstOnly.add(labelSubstitutionLabelSmoother
-          .getSmoothedLabelString(substitutedToLabel));
-    }
+    List<String> ruleNonterminalLabelsFirstOnly = getLabelSmoothedLabels(
+        labelSubstitutionLabelSmoother, this.ruleNonterminalLabels);
+
+    List<String> ruleSubstitutedToLabelsFirstOnly = getLabelSmoothedLabels(
+        labelSubstitutionLabelSmoother, this.substitutedToLabels);
 
     return new SparseSubstitutionDescription(ruleIsInverted, leftHandSideLabelFirstLabelOnly,
         ruleNonterminalLabelsFirstOnly, ruleSubstitutedToLabelsFirstOnly);
@@ -80,8 +92,7 @@ public class SparseSubstitutionDescription {
   public SparseSubstitutionDescription getSecondLabelOnlySparseSubstitutionDescription() {
     return getOneLabelOnlySparseSubstitutionDescription(new LastSublabelOnlyLabelSubstitutionLabelSmoother());
   }
-  
-  
+
   public int getNumberOfMatchingSubstitutions() {
     int result = 0;
     for (SubstitutionPair substitutionPair : getSubstitutionPairs()) {

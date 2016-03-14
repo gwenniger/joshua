@@ -21,6 +21,8 @@ import joshua.decoder.ff.OOVFF;
 import joshua.decoder.ff.PhraseModelFF;
 import joshua.decoder.ff.SourcePathFF;
 import joshua.decoder.ff.WordPenaltyFF;
+import joshua.decoder.ff.featureScorePrediction.FeatureScorePredictor;
+import joshua.decoder.ff.featureScorePrediction.LabelSubstitutionFFAndFFPredictionCreater;
 import joshua.decoder.ff.lm.KenLMFF;
 import joshua.decoder.ff.lm.LanguageModelFF;
 import joshua.decoder.ff.lm.NGramLanguageModel;
@@ -77,6 +79,10 @@ public class Decoder {
 
   /* The feature weights. */
   public static FeatureVector weights;
+  
+  /* Feature score predictor for label substitution features*/
+  public static FeatureScorePredictor featureScorePredictor; 
+  
 
   /** Logger for this class. */
   private static final Logger logger = Logger.getLogger(Decoder.class.getName());
@@ -687,23 +693,18 @@ public class Decoder {
         weights.put(String.format("tm_%s_%s", owner, index), weight);
       }
 
-      else if (feature.equals(LabelCombinationFF.getLowerCasedFeatureName())) {
-        this.featureFunctions.add(new LabelCombinationFF(weights));
+      
+      //else if (feature.equals(LabelCombinationFF.getLowerCasedFeatureName())) {
+      //  this.featureFunctions.add(new LabelCombinationFF(weights));
+      //}
+      
+      else if(LabelSubstitutionFFAndFFPredictionCreater.isRelevantFeatureName(feature)){
+        this.featureFunctions.add(LabelSubstitutionFFAndFFPredictionCreater.createLabelSubstitutionFFForFeatureName(feature, weights, joshuaConfiguration));
+        logger.info("Creating feature score predictor");
+        Decoder.featureScorePredictor = LabelSubstitutionFFAndFFPredictionCreater.createLightWeightLabelSubstitutionFeatureScorePredictorForFeatureName(feature, weights, joshuaConfiguration);
+        logger.info("Created feature score predictor" + Decoder.featureScorePredictor);
       }
       
-      else  if (stringsEqualIgnoreCase(feature, LabelSubstitutionFF.getFeatureNameStandardFeature())){
-        this.featureFunctions.add(LabelSubstitutionFF.createStandardLabelSubstitutionFF(weights,joshuaConfiguration));
-      }
-      else  if (stringsEqualIgnoreCase(feature, LabelSubstitutionFF.getFeatureNameStandardSparseFeature())){
-        this.featureFunctions.add(LabelSubstitutionFF.createStandardLabelSubstitutionSparseFF(weights,joshuaConfiguration));
-      }
-      else if (stringsEqualIgnoreCase(feature,LabelSubstitutionFF.getFeatureNameDoubleLabelFeature())) {
-        this.featureFunctions.add(LabelSubstitutionFF.createLabelSubstitutionFFDoubleLabel(weights,joshuaConfiguration));
-      }
-      else if (stringsEqualIgnoreCase(feature,LabelSubstitutionFF.getFeatureNameDoubleLabelSparseFeature())) {
-        this.featureFunctions.add(LabelSubstitutionFF.createLabelSubstitutionFFDoubleLabelSparse(weights,joshuaConfiguration));
-      }
-
       else {
         System.err.println("* WARNING: invalid feature '" + featureLine + "'");
       }

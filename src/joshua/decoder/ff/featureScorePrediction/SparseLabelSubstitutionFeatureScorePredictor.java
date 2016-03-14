@@ -62,7 +62,7 @@ public class SparseLabelSubstitutionFeatureScorePredictor implements FeatureScor
 
   private static boolean isRelevantFeature(String featureTypePrefix, String featureString) {
     if (featureString.startsWith(featureTypePrefix)) {
-      return LabelSubstitutionFF.isBasicLabelSubstitutionFeatureString(featureString);
+      return LabelSubstitutionFF.isSparseLabelSubstitutionFeatureString(featureString);
     }
     return false;
   }

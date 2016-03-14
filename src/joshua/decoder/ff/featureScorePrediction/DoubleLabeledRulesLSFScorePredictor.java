@@ -18,7 +18,7 @@ public class DoubleLabeledRulesLSFScorePredictor implements FeatureScorePredicto
     this.bothLabelsTogetherFeatureScorePredictor = bothLabelsTogetherFeatureScorePredictor;
   }
 
-  public static SparseLabelSubstitutionFeatureScorePredictor createSparseLabelSubstitutionFeatureScorePredictor(
+  private static SparseLabelSubstitutionFeatureScorePredictor createSparseLabelSubstitutionFeatureScorePredictor(
       String labelSubstitutionRootTypeName,
       LabelSubstitutionLabelSmoother labelSubstitutionLabelSmoother, FeatureVector featureVector) {
 
