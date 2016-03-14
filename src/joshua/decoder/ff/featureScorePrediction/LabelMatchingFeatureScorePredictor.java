@@ -2,16 +2,16 @@ package joshua.decoder.ff.featureScorePrediction;
 
 import joshua.decoder.ff.FeatureVector;
 import joshua.decoder.ff.LabelSubstitutionFF;
-
+import joshua.decoder.ff.featureScorePrediction.BasicLabelSubstitutionFeatureScorePredictor.SubstitutionPair;
 import org.junit.Assert;
 
-public class LabelMatchingFeatureScorePredictor {
-  private final double matchScore;
-  private final double noMatchScore;
+public class LabelMatchingFeatureScorePredictor  {
+  private final float matchScore;
+  private final float noMatchScore;
 
   private final String featureTypePrefix;
 
-  private LabelMatchingFeatureScorePredictor(double matchScore, double noMatchScore,
+  private LabelMatchingFeatureScorePredictor(float matchScore, float noMatchScore,
       String featureTypePrefix) {
     this.matchScore = matchScore;
     this.noMatchScore = noMatchScore;
@@ -20,9 +20,8 @@ public class LabelMatchingFeatureScorePredictor {
 
   public static LabelMatchingFeatureScorePredictor createLabelMatchingFeatureScorePredictor(
       String featureTypePrefix, FeatureVector featureVector) {
-    return new LabelMatchingFeatureScorePredictor(
-        getMatchScore(featureTypePrefix, featureVector), getNoMatchScore(featureTypePrefix,
-            featureVector), featureTypePrefix);
+    return new LabelMatchingFeatureScorePredictor(getMatchScore(featureTypePrefix, featureVector),
+        getNoMatchScore(featureTypePrefix, featureVector), featureTypePrefix);
   }
 
   private static String getMatchFeatureString(String featureTypePrefix) {
@@ -33,26 +32,47 @@ public class LabelMatchingFeatureScorePredictor {
     return featureTypePrefix + LabelSubstitutionFF.getNoMatchFeatureSuffix();
   }
 
-  private static double getMatchScore(String featureTypePrefix, FeatureVector featureVector) {
+  private static float getMatchScore(String featureTypePrefix, FeatureVector featureVector) {
     Assert.assertTrue(featureVector.containsKey(getMatchFeatureString(featureTypePrefix)));
     return featureVector.get(getMatchFeatureString(featureTypePrefix));
   }
 
-  private static double getNoMatchScore(String featureTypePrefix, FeatureVector featureVector) {
+  private static float getNoMatchScore(String featureTypePrefix, FeatureVector featureVector) {
     Assert.assertTrue(featureVector.containsKey(getNoMatchFeatureString(featureTypePrefix)));
     return featureVector.get(getNoMatchFeatureString(featureTypePrefix));
   }
 
-  public double getNoMatchScore() {
+  public float getNoMatchScore() {
     return noMatchScore;
   }
 
-  public double getMatchScore() {
+  public float getMatchScore() {
     return matchScore;
   }
 
   public String getFeatureTypePrefix() {
     return featureTypePrefix;
+  }
+
+  public float getMaxOfMatchAndNoMatchScore(){
+    return Math.max(getMatchScore(), getNoMatchScore());
+  }
+  
+  
+  public float predictLabelSubstitutionFeatureScore(SubstitutionPair substitutionPair){
+    if(substitutionPair.isMatchingSubstitution()){
+      return getMatchScore();
+    }
+    return getNoMatchScore();
+  }
+  
+  public float predictLabelSubstitutionFeatureScore(
+      SparseSubstitutionDescription sparseSubstitutionDescription) {
+    float result = 0;
+    result += sparseSubstitutionDescription.getNumberOfMatchingSubstitutions() * getMatchScore();
+    result += sparseSubstitutionDescription.getNumberOfNonMatchingSubstitutions()
+        * getNoMatchScore();
+    return result;
   }
 
 }

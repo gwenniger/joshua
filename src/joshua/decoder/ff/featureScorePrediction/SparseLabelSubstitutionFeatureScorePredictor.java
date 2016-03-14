@@ -1,29 +1,50 @@
 package joshua.decoder.ff.featureScorePrediction;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import joshua.decoder.ff.FeatureVector;
 import joshua.decoder.ff.LabelSubstitutionFF;
-import junit.framework.Assert;
+import joshua.decoder.ff.LabelSubstitutionFF.LabelSubstitutionLabelSmoother;
 
-public class SparseLabelSubstitutionFeatureScorePredictor {
+public class SparseLabelSubstitutionFeatureScorePredictor implements FeatureScorePredictor {
+  private final BasicLabelSubstitutionFeatureScorePredictor basicLabelSubstitutionFeatureScorePredictor;
   private final String featureTypePrefix;
-  private final Map<SparseSubstitutionDescription, Float> substitutionPairToScoreMap;
+  private final Map<SparseSubstitutionDescription, Float> sparseSubstitutionDescriptionToScoreMap;
 
-  private SparseLabelSubstitutionFeatureScorePredictor(String featureTypePrefix,
-      Map<SparseSubstitutionDescription, Float> substitutionPairToScoreMap) {
-    this.substitutionPairToScoreMap = substitutionPairToScoreMap;
+  private SparseLabelSubstitutionFeatureScorePredictor(
+      BasicLabelSubstitutionFeatureScorePredictor basicLabelSubstitutionFeatureScorePredictor,
+      String featureTypePrefix, Map<SparseSubstitutionDescription, Float> substitutionPairToScoreMap) {
+    this.basicLabelSubstitutionFeatureScorePredictor = basicLabelSubstitutionFeatureScorePredictor;
+    this.sparseSubstitutionDescriptionToScoreMap = substitutionPairToScoreMap;
     this.featureTypePrefix = featureTypePrefix;
   }
 
   public static SparseLabelSubstitutionFeatureScorePredictor createSparseLabelSubstitutionFeatureScorePredictor(
       String featureTypePrefix, FeatureVector featureVector) {
-    return new SparseLabelSubstitutionFeatureScorePredictor(featureTypePrefix,
+    return new SparseLabelSubstitutionFeatureScorePredictor(
+        BasicLabelSubstitutionFeatureScorePredictor.createBasicLabelSubstitutionFeatureScorePredictor(
+            featureTypePrefix, featureVector), featureTypePrefix,
         computeSubstitutionPairToScoreMap(featureTypePrefix, featureVector));
   }
+  
+  public static SparseLabelSubstitutionFeatureScorePredictor createSparseLabelSubstitutionFeatureScorePredictor(
+      String labelSubstitutionRootTypeName,
+      LabelSubstitutionLabelSmoother labelSubstitutionLabelSmoother, FeatureVector featureVector) {
+    String featureTypePrefix = LabelSubstitutionFF.getFeatureNamesPrefix(
+        labelSubstitutionRootTypeName, labelSubstitutionLabelSmoother);
+    return createSparseLabelSubstitutionFeatureScorePredictor(featureTypePrefix, featureVector);
+  }
 
+  public static SparseLabelSubstitutionFeatureScorePredictor createSparseLabelSubstitutionFeatureScorePredictorStandAlone(
+      String labelSubstitutionRootTypeName, FeatureVector featureVector) {
+    String featureTypePrefix = LabelSubstitutionFF.getFeatureNamesPrefix(
+        labelSubstitutionRootTypeName, new LabelSubstitutionFF.NoSmoothingLabelSubstitutionLabelSmoother());
+    return createSparseLabelSubstitutionFeatureScorePredictor(featureTypePrefix, featureVector);
+  }
+  
   private static Map<SparseSubstitutionDescription, Float> computeSubstitutionPairToScoreMap(
       String featureTypePrefix, FeatureVector featureVector) {
     Map<SparseSubstitutionDescription, Float> result = new HashMap<SparseSubstitutionDescription, Float>();
@@ -46,42 +67,72 @@ public class SparseLabelSubstitutionFeatureScorePredictor {
     return false;
   }
 
-  private static class SparseSubstitutionDescription {
-    private final boolean ruleIsInverted;
-    private final String leftHandSideLabel;
-    private final List<String> ruleNonterminalLabels;
-    private final List<String> substitutedToLabels;
-
-    public SparseSubstitutionDescription(boolean ruleIsInverted, String ruleLeftHandSideLabel,
-        List<String> ruleNonterminalLabels, List<String> substitutedToLabels) {
-      this.ruleIsInverted = ruleIsInverted;
-      this.leftHandSideLabel = ruleLeftHandSideLabel;
-      this.ruleNonterminalLabels = ruleNonterminalLabels;
-      this.substitutedToLabels = substitutedToLabels;
+  protected List<SparseSubstitutionDescription> getSparseSubstitutionDescriptionsUnaryRules() {
+    List<SparseSubstitutionDescription> result = new ArrayList<SparseSubstitutionDescription>();
+    for (SparseSubstitutionDescription sparseSubstitutionDescription : this.sparseSubstitutionDescriptionToScoreMap
+        .keySet()) {
+      if (sparseSubstitutionDescription.isUnaryRule()) {
+        result.add(sparseSubstitutionDescription);
+      }
     }
-
-    private static SparseSubstitutionDescription creatSparseSubstitutionDescription(
-        String featureTypePrefix, String sparseFeatureString) {
-      String featureSubstring = sparseFeatureString.substring(sparseFeatureString
-          .indexOf(featureTypePrefix) + featureTypePrefix.length());
-      String[] parts = featureSubstring.split(LabelSubstitutionFF
-          .getBasicLabelSubstitutionFeatureSubstitutionInfix());
-      Assert.assertEquals(2, parts.length);
-
-      boolean ruleIsInverted = LabelSubstitutionFF
-          .geRuleOrientationIsInvertedFromSparseFeatureString(sparseFeatureString);
-      String ruleLeftHandSideLabel = LabelSubstitutionFF
-          .getLeftHandSideFromSparseFeatureString(sparseFeatureString);
-      List<String> ruleNonterminalLabels = LabelSubstitutionFF
-          .geRuleNonterminalsFromSparseFeatureString(sparseFeatureString);
-      List<String> substitutedToLabels = LabelSubstitutionFF
-          .geRuleSubstitutedToLabelsFromSparseFeatureString(sparseFeatureString);
-
-      // substitutedToLabels
-
-      return new SparseSubstitutionDescription(ruleIsInverted, ruleLeftHandSideLabel,
-          ruleNonterminalLabels, substitutedToLabels);
-    }
-
+    return result;
   }
+
+  protected List<SparseSubstitutionDescription> getSparseSubstitutionDescriptionsBinaryRules() {
+    List<SparseSubstitutionDescription> result = new ArrayList<SparseSubstitutionDescription>();
+    for (SparseSubstitutionDescription sparseSubstitutionDescription : this.sparseSubstitutionDescriptionToScoreMap
+        .keySet()) {
+      if (sparseSubstitutionDescription.isBinaryRule()) {
+        result.add(sparseSubstitutionDescription);
+      }
+    }
+    return result;
+  }
+
+  public float predictLabelSubstitutionFeatureScore(
+      SparseSubstitutionDescription sparseSubstitutionDescription) {
+    float result = 0;
+
+    // Because the feature representation is sparse, it is possible that a more complex sparse
+    // double labeled feature  exists, but no non-zero weight features
+    // exist for some or all of the smoothed single label sparse substitution features.
+    // Therefore we must check for the existence of the parseSubstitutionDescription
+    if (this.sparseSubstitutionDescriptionToScoreMap.containsKey(sparseSubstitutionDescription)) {
+      result += this.sparseSubstitutionDescriptionToScoreMap.get(sparseSubstitutionDescription);
+    }
+    result += basicLabelSubstitutionFeatureScorePredictor
+        .predictLabelSubstitutionFeatureScore(sparseSubstitutionDescription);
+    return result;
+  }
+
+  public float predictMaximumLabelSubstitutionFeatureScoreUnaryRule() {
+    float result = basicLabelSubstitutionFeatureScorePredictor
+        .predictMaximumLabelSubstitutionFeatureScoreUnaryRule();
+    for (SparseSubstitutionDescription sparseSubstitutionDescription : getSparseSubstitutionDescriptionsUnaryRules()) {
+      float candidateResult = predictLabelSubstitutionFeatureScore(sparseSubstitutionDescription);
+      if (candidateResult > result) {
+        result = candidateResult;
+      }
+    }
+
+    return result;
+  }
+
+  public float predictMaxiLabelSubstitutionFeatureScoreBinaryRule() {
+    float result = basicLabelSubstitutionFeatureScorePredictor
+        .predictMaxiLabelSubstitutionFeatureScoreBinaryRule();
+    for (SparseSubstitutionDescription sparseSubstitutionDescription : getSparseSubstitutionDescriptionsBinaryRules()) {
+      float candidateResult = predictLabelSubstitutionFeatureScore(sparseSubstitutionDescription);
+      if (candidateResult > result) {
+        result = candidateResult;
+      }
+    }
+
+    return result;
+  }
+
+  public String getFeatureTypePrefix() {
+    return featureTypePrefix;
+  }
+
 }
