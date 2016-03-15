@@ -24,10 +24,16 @@ public class EncoderConfiguration {
   
   private boolean labeled;
   
+  private int numDenseFeatures = 0;
+  
   public EncoderConfiguration() {
     this.outerToInner = new HashMap<Integer, Integer>();
   }
 
+  public int getNumDenseFeatures() {
+    return numDenseFeatures;
+  }
+  
   public int getNumFeatures() {
     return encoders.length;
   }
@@ -59,6 +65,10 @@ public class EncoderConfiguration {
       if (labeled) {
         String feature_name = in_stream.readUTF();
         outer_id = Vocabulary.id(feature_name);
+        try {
+          Integer.parseInt(feature_name);
+          numDenseFeatures++;
+        } catch (NumberFormatException e) {}
       } else {
         outer_id = in_stream.readInt();
       }
@@ -111,8 +121,18 @@ public class EncoderConfiguration {
     
       EncoderConfiguration encoding = new EncoderConfiguration();
       encoding.load(grammar_dir + File.separator + "encoding");
-      
+      int num_features = encoding.getNumFeatures();
       System.out.println(String.format("num_features = %d", encoding.getNumFeatures()));
+
+      for (int feature_id = 0; feature_id < num_features; feature_id++) {
+        if (Vocabulary.size() == 1) {
+          System.out.println(String.format("feature: %d", feature_id));
+        } else {
+          String name = Vocabulary.word(encoding.outerId(feature_id));
+          System.out.println(String.format("feature: %s", name));
+        }
+      }
+
     } catch (ArrayIndexOutOfBoundsException e) {
       System.err.println("Usage: EncoderConfiguration <packed_directory>");
       System.exit(1);

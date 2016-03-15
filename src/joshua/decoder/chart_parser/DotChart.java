@@ -6,15 +6,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
 import org.junit.Assert;
-
 import joshua.corpus.Vocabulary;
 import joshua.decoder.chart_parser.DotNodeTypeCreater.DotNodeCreater;
 import joshua.decoder.ff.tm.Grammar;
 import joshua.decoder.ff.tm.Rule;
 import joshua.decoder.ff.tm.RuleCollection;
 import joshua.decoder.ff.tm.Trie;
+import joshua.decoder.segment_file.Token;
 import joshua.lattice.Arc;
 import joshua.lattice.Lattice;
 import joshua.lattice.Node;
@@ -72,7 +71,7 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
   private final int sentLen;
 
   /* Represents the input sentence being translated. */
-  private final Lattice<Integer> input;
+  private final Lattice<Token> input;
 
   /* If enabled, rule terminals are treated as regular expressions. */
   private final boolean regexpMatching;
@@ -85,6 +84,7 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
   
   // A DotNodeTypeCreater which takes care of using the right type of DotNodes,using strategy
   private final DotNodeTypeCreater<T,T2> dotNodeTypeCreater;
+
 
   // ===============================================================
   // Static fields
@@ -111,9 +111,12 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
 
 
 
-  public DotChart(Lattice<Integer> input, Grammar grammar, Chart chart,
+  public DotChart(Lattice<Token> input, Grammar grammar, Chart chart,
       NonterminalMatcher<T> nonTerminalMatcher, DotNodeTypeCreater<T,T2> dotNodeTypeCreater, 
       boolean regExpMatching) {
+//=======
+//  public DotChart(Lattice<Token> input, Grammar grammar, Chart chart, boolean regExpMatching) {
+//>>>>>>> 090cb8c5287c85bec08ba4b48c16088e2b9a8449
 
     this.dotChart = chart;
     this.pGrammar = grammar;
@@ -125,24 +128,8 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
     this.dotNodeTypeCreater = dotNodeTypeCreater;
     this.regexpMatching = regExpMatching;
 
-    // seeding the dotChart
     seed();
   }
-
-
-  /*
-   * public DotChart(Lattice<Integer> input, Grammar grammar, Chart chart, boolean
-   * useRegexpMatching) { this.dotChart = chart; this.pGrammar = grammar; this.input = input;
-   * this.sentLen = input.size(); this.dotcells = new ChartSpan<DotCell>(sentLen, null);
-   * 
-   * // seeding the dotChart seed();
-   * 
-   * this.regexpMatching = useRegexpMatching; }
-   */
-
-  // ===============================================================
-  // Package-protected methods
-  // ===============================================================
 
   /**
    * Add initial dot items: dot-items pointer to the root of the grammar trie.
@@ -197,10 +184,10 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
      * (2) If the the dot-item is looking for a source-side terminal symbol, we simply match against
      * the input sentence and advance the dot.
      */
-    Node<Integer> node = input.getNode(j - 1);
-    for (Arc<Integer> arc : node.getOutgoingArcs()) {
+    Node<Token> node = input.getNode(j - 1);
+    for (Arc<Token> arc : node.getOutgoingArcs()) {
 
-      int last_word = arc.getLabel();
+      int last_word = arc.getLabel().getWord();
       int arc_len = arc.getHead().getNumber() - arc.getTail().getNumber();
 
       // int last_word=foreign_sent[j-1]; // input.getNode(j-1).getNumber(); //
@@ -219,10 +206,7 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
           // List<Trie> child_tnodes = ruleMatcher.produceMatchingChildTNodesTerminalevel(dotNode,
           // last_word);
 
-
           List<Trie> child_tnodes = null;
-
-
 
           if (this.regexpMatching) {
             child_tnodes = matchAll(dotNode, last_word);
@@ -231,20 +215,16 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
             child_tnodes = Arrays.asList(child_node);
           }
 
-
           if (!(child_tnodes == null || child_tnodes.isEmpty())) {
             for (Trie child_tnode : child_tnodes) {
               if (null != child_tnode) {
                 addDotItem(child_tnode, i, j - 1 + arc_len, dotNode.getAntSuperNodes(), null,
                     dotNode.srcPath.extend(arc));
-
-
               }
             }
           }
         }
       }
-
     }
   }
 
@@ -309,6 +289,9 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
     }
   }
   
+  
+  
+  
   @SuppressWarnings("unchecked")
   private void addEfficientMultiLabelDotItemsFuzzyMatching(int i, int j,List<SuperNode> neitherOOVNorGoalSymbolSuperNodes,T dotNode, boolean skipUnary){
     /* For every completed nonterminal in the main chart */
@@ -336,6 +319,7 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
               addDotItem(child_tnode, i, j, dotNode.getAntSuperNodes(), (T2) neitherOOVNorGoalSymbolSuperNodes, dotNode
                   .getSourcePath().extendNonTerminal());
             }
+
           }
         }
       }               
@@ -410,6 +394,7 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
   private void addDotItem(Trie tnode, int i, int j, List<T2> antSuperNodesIn,
       T2 curSuperNode, SourcePath srcPath) {
     List<T2> antSuperNodes = new ArrayList<T2>();
+
     if (antSuperNodesIn != null) {
       antSuperNodes.addAll(antSuperNodesIn);
     }
@@ -479,18 +464,34 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
     // Package-protected instance fields
     // =======================================================
 
-    // int i, j; //start and end position in the chart
+    protected int i, j; //start and end position in the chart
     protected Trie trieNode = null; // dot_position, point to grammar trie node, this is the only
                                   // place that the DotChart points to the grammar
-    
+     
+    /* The source lattice cost of applying the rule */
     protected SourcePath srcPath;
 
+
     protected  DotNodeBase(int i, int j, Trie trieNode, SourcePath srcPath) {
-      // i = i_in;
-      // j = j_in;
+      i = this.i;
+      j = this.j;
       this.trieNode = trieNode;
       this.srcPath = srcPath;
     }
+
+    
+    /* A list of grounded (over a span) nonterminals that have been crossed in traversing the rule */
+    private ArrayList<SuperNode> antSuperNodes = null;
+        
+
+    @Override
+    public String toString() {
+      int size = 0;
+      if (trieNode != null && trieNode.getRuleCollection() != null)
+        size = trieNode.getRuleCollection().getRules().size();
+      return String.format("DOTNODE i=%d j=%d #rules=%d #tails=%d", i, j, size, antSuperNodes.size());
+    }
+    
 
     public boolean equals(Object obj) {
       if (obj == null)
@@ -522,7 +523,11 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
     }
 
     // convenience function
-    public RuleCollection getApplicableRules() {
+    public boolean hasRules() {
+      return getTrieNode().getRuleCollection() != null && getTrieNode().getRuleCollection().getRules().size() != 0;
+    }
+    
+    public RuleCollection getRuleCollection() {
       return getTrieNode().getRuleCollection();
     }
 
@@ -535,8 +540,18 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
     }
     
     public abstract List<T> getAntSuperNodes();
-      
+    
+
+    public int begin() {
+      return i;
+    }
+  
+    public int end() {
+      return j;
+    }
   }
+      
+  
   
   /**
    * A DotNode represents the partial application of a rule rooted to a particular span (i,j). It
@@ -546,6 +561,17 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
   
     private List<SuperNode> antSuperNodes = null; // pointer to SuperNode in Chart
     
+    
+    /**
+     * Initialize a dot node with the span, grammar trie node, list of supernode tail pointers, and
+     * the lattice sourcepath.
+     * 
+     * @param i
+     * @param j
+     * @param trieNode
+     * @param antSuperNodes
+     * @param srcPath
+     */
     public DotNode(int i, int j, Trie trieNode, List<SuperNode> antSuperNodes, SourcePath srcPath) {
       super(i,j,trieNode,srcPath);
       this.antSuperNodes = antSuperNodes;
@@ -577,7 +603,6 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
       return antSuperNodeLists;
     }
     
- 
   }
 
 }

@@ -1,77 +1,139 @@
 package joshua.decoder.ff.tm.packed;
 
+/***
+ * This package implements Joshua's packed grammar structure, which enables the efficient loading	
+ * and accessing of grammars. It is described in the paper:
+ * 
+ * @article{ganitkevitch2012joshua,
+ *   Author = {Ganitkevitch, J. and Cao, Y. and Weese, J. and Post, M. and Callison-Burch, C.},
+ *   Journal = {Proceedings of WMT12},
+ *   Title = {Joshua 4.0: Packing, PRO, and paraphrases},
+ *   Year = {2012}}
+ *   
+ * The packed grammar works by compiling out the grammar tries into a compact format that is loaded
+ * and parsed directly from Java arrays. A fundamental problem is that Java arrays are indexed
+ * by ints and not longs, meaning the maximum size of the packed grammar is about 2 GB. This forces
+ * the use of packed grammar slices, which together constitute the grammar. The figure in the
+ * paper above shows what each slice looks like. 
+ * 
+ * The division across slices is done in a depth-first manner. Consider the entire grammar organized
+ * into a single source-side trie. The splits across tries are done by grouping the root-level
+ * outgoing trie arcs --- and the entire trie beneath them --- across slices. 
+ * 
+ * This presents a problem: if the subtree rooted beneath a single top-level arc is too big for a 
+ * slice, the grammar can't be packed. This happens with very large Hiero grammars, for example,
+ * where there are a *lot* of rules that start with [X].
+ * 
+ * A solution being worked on is to split that symbol and pack them into separate grammars with a
+ * shared vocabulary, and then rely on Joshua's ability to query multiple grammars for rules to
+ * solve this problem. This is not currently implemented but could be done directly in the
+ * Grammar Packer.
+ *
+ * *UPDATE 10/2015*
+ * The introduction of a SliceAggregatingTrie together with sorting the grammar by the full source string
+ * (not just by the first source word) allows distributing rules with the same first source word
+ * across multiple slices.
+ * @author fhieber
+ */
+
+import static java.util.Collections.sort;
+
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.IntBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.security.DigestInputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.logging.Logger;
+import java.util.Map;
 
 import joshua.corpus.Vocabulary;
+import joshua.decoder.Decoder;
 import joshua.decoder.JoshuaConfiguration;
 import joshua.decoder.ff.FeatureFunction;
 import joshua.decoder.ff.FeatureVector;
+import joshua.decoder.ff.tm.AbstractGrammar;
 import joshua.decoder.ff.tm.BasicRuleCollection;
-import joshua.decoder.ff.tm.BatchGrammar;
-import joshua.decoder.ff.tm.BilingualRule;
 import joshua.decoder.ff.tm.Rule;
 import joshua.decoder.ff.tm.RuleCollection;
 import joshua.decoder.ff.tm.Trie;
 import joshua.decoder.ff.tm.hash_based.ExtensionIterator;
+import joshua.decoder.ff.tm.packed.SliceAggregatingTrie;
 import joshua.util.encoding.EncoderConfiguration;
 import joshua.util.encoding.FloatEncoder;
+import joshua.util.io.LineReader;
 
-public class PackedGrammar extends BatchGrammar {
-
-  private static final Logger logger = Logger.getLogger(PackedGrammar.class.getName());
+public class PackedGrammar extends AbstractGrammar {
 
   private EncoderConfiguration encoding;
 
   private PackedRoot root;
   private ArrayList<PackedSlice> slices;
+  private final File vocabFile; // store path to vocabulary file
 
-  public PackedGrammar(String grammar_dir, int span_limit, String owner,
+  public static final String VOCABULARY_FILENAME = "vocabulary";
+
+  // The grammar specification keyword (e.g., "thrax" or "moses")
+  private String type;
+
+  public PackedGrammar(String grammar_dir, int span_limit, String owner, String type,
       JoshuaConfiguration joshuaConfiguration) throws FileNotFoundException, IOException {
     super(joshuaConfiguration);
     this.spanLimit = span_limit;
+    this.type = type;
 
     // Read the vocabulary.
-    logger.info("Reading vocabulary: " + grammar_dir + File.separator + "vocabulary");
-    Vocabulary.read(grammar_dir + File.separator + "vocabulary");
-
+    vocabFile = new File(grammar_dir + File.separator + VOCABULARY_FILENAME);
+    Decoder.LOG(1, String.format("Reading vocabulary: %s", vocabFile));
+    if (!Vocabulary.read(vocabFile)) {
+      throw new RuntimeException("mismatches or collisions while reading on-disk vocabulary");
+    }
+    
+    // Read the config
+    String configFile = grammar_dir + File.separator + "config";
+    if (new File(configFile).exists()) {
+      Decoder.LOG(1, String.format("Reading packed config: %s", configFile));
+      readConfig(configFile);
+    }
+    
     // Read the quantizer setup.
-    logger.info("Reading encoder configuration: " + grammar_dir + File.separator + "encoding");
+    Decoder.LOG(1, String.format("Reading encoder configuration: %s%sencoding", grammar_dir, File.separator));
     encoding = new EncoderConfiguration();
     encoding.load(grammar_dir + File.separator + "encoding");
 
     // Set phrase owner.
     this.owner = Vocabulary.id(owner);
 
-    String[] listing = new File(grammar_dir).list();
+    final List<String> listing = Arrays.asList(new File(grammar_dir).list());
+    sort(listing); // File.list() has arbitrary sort order
     slices = new ArrayList<PackedSlice>();
-    for (int i = 0; i < listing.length; i++) {
-      if (listing[i].startsWith("slice_") && listing[i].endsWith(".source"))
-        slices.add(new PackedSlice(grammar_dir + File.separator + listing[i].substring(0, 11)));
+    for (String prefix : listing) {
+      if (prefix.startsWith("slice_") && prefix.endsWith(".source"))
+        slices.add(new PackedSlice(grammar_dir + File.separator + prefix.substring(0, 11)));
     }
 
     long count = 0;
     for (PackedSlice s : slices)
       count += s.estimated.length;
-    root = new PackedRoot(this);
+    root = new PackedRoot(slices);
 
-    logger.info("Loaded " + count + " rules.");
+    Decoder.LOG(1, String.format("Loaded %d rules", count));
   }
 
   @Override
@@ -92,30 +154,121 @@ public class PackedGrammar extends BatchGrammar {
     return num_rules;
   }
 
+  @Override
+  public int getNumDenseFeatures() {
+    return encoding.getNumDenseFeatures();
+  }
+
   public Rule constructManualRule(int lhs, int[] src, int[] tgt, float[] scores, int arity) {
     return null;
   }
+  
+  /**
+   * Computes the MD5 checksum of the vocabulary file.
+   * Can be used for comparing vocabularies across multiple packedGrammars.
+   */
+  public String computeVocabularyChecksum() {
+    MessageDigest md;
+    try {
+      md = MessageDigest.getInstance("MD5");
+    } catch (NoSuchAlgorithmException e) {
+      throw new RuntimeException("Unknown checksum algorithm");
+    }
+    byte[] buffer = new byte[1024];
+    try (final InputStream is = Files.newInputStream(Paths.get(vocabFile.toString()));
+        DigestInputStream dis = new DigestInputStream(is, md)) {
+      while (dis.read(buffer) != -1) {}
+    } catch (IOException e) {
+      throw new RuntimeException("Can not find vocabulary file. This should not happen.");
+    }
+    byte[] digest = md.digest();
+    // convert the byte to hex format
+    StringBuffer sb = new StringBuffer("");
+    for (int i = 0; i < digest.length; i++) {
+      sb.append(Integer.toString((digest[i] & 0xff) + 0x100, 16).substring(1));
+    }
+    return sb.toString();
+  }
 
+  /**
+   * PackedRoot represents the root of the packed grammar trie.
+   * Tries for different source-side firstwords are organized in
+   * packedSlices on disk. A packedSlice can contain multiple trie
+   * roots (i.e. multiple source-side firstwords).
+   * The PackedRoot builds a lookup table, mapping from
+   * source-side firstwords to the addresses in the packedSlices
+   * that represent the subtrie for a particular firstword.
+   * If the GrammarPacker has to distribute rules for a
+   * source-side firstword across multiple slices, a
+   * SliceAggregatingTrie node is created that aggregates those 
+   * tries to hide
+   * this additional complexity from the grammar interface
+   * This feature allows packing of grammars where the list of rules
+   * for a single source-side firstword would exceed the maximum array
+   * size of Java (2gb).
+   */
   public final class PackedRoot implements Trie {
 
-    private HashMap<Integer, PackedSlice> lookup;
+    private final HashMap<Integer, Trie> lookup;
 
-    public PackedRoot(PackedGrammar grammar) {
-      lookup = new HashMap<Integer, PackedSlice>();
-
-      for (PackedSlice ps : grammar.slices) {
-        int num_children = ps.source[0];
-        for (int i = 0; i < num_children; i++)
-          lookup.put(ps.source[2 * i + 1], ps);
+    public PackedRoot(final List<PackedSlice> slices) {
+      final Map<Integer, List<Trie>> childTries = collectChildTries(slices);
+      lookup = buildLookupTable(childTries);
+    }
+    
+    /**
+     * Determines whether trie nodes for source first-words are spread over 
+     * multiple packedSlices by counting their occurrences.
+     * @param slices
+     * @return A mapping from first word ids to a list of trie nodes.
+     */
+    private Map<Integer, List<Trie>> collectChildTries(final List<PackedSlice> slices) {
+      final Map<Integer, List<Trie>> childTries = new HashMap<>();
+      for (PackedSlice packedSlice : slices) {
+        
+        // number of tries stored in this packedSlice
+        final int num_children = packedSlice.source[0];
+        for (int i = 0; i < num_children; i++) {
+          final int id = packedSlice.source[2 * i + 1];
+          
+          /* aggregate tries with same root id
+           * obtain a Trie node, already at the correct address in the packedSlice.
+           * In other words, the lookup index already points to the correct trie node in the packedSlice.
+           * packedRoot.match() thus can directly return the result of lookup.get(id);
+           */
+          if (!childTries.containsKey(id)) {
+            childTries.put(id, new ArrayList<Trie>(1));
+          }
+          final Trie trie = packedSlice.root().match(id);
+          childTries.get(id).add(trie);
+        }
       }
+      return childTries;
+    }
+    
+    /**
+     * Build a lookup table for children tries.
+     * If the list contains only a single child node, a regular trie node
+     * is inserted into the table; otherwise a SliceAggregatingTrie node is
+     * created that hides this partitioning into multiple packedSlices
+     * upstream.
+     */
+    private HashMap<Integer,Trie> buildLookupTable(final Map<Integer, List<Trie>> childTries) {
+      HashMap<Integer,Trie> lookup = new HashMap<>(childTries.size());
+      for (int id : childTries.keySet()) {
+        final List<Trie> tries = childTries.get(id);
+        if (tries.size() == 1) {
+          lookup.put(id, tries.get(0));
+        } else {
+          lookup.put(id, new SliceAggregatingTrie(tries));
+        }
+      }
+      return lookup;
     }
 
     @Override
     public Trie match(int word_id) {
-      PackedSlice ps = lookup.get(word_id);
-      if (ps != null)
-        return ps.root().match(word_id);
-      return null;
+      return lookup.get(word_id);
     }
 
     @Override
@@ -125,19 +278,12 @@ public class PackedGrammar extends BatchGrammar {
 
     @Override
     public HashMap<Integer, ? extends Trie> getChildren() {
-      HashMap<Integer, Trie> children = new HashMap<Integer, Trie>();
-      for (int key : lookup.keySet())
-        children.put(key, match(key));
-      return children;
+      return lookup;
     }
 
     @Override
     public ArrayList<? extends Trie> getExtensions() {
-      ArrayList<Trie> tries = new ArrayList<Trie>();
-      for (int key : lookup.keySet()) {
-        tries.add(match(key));
-      }
-      return tries;
+      return new ArrayList<>(lookup.values());
     }
 
     @Override
@@ -176,7 +322,14 @@ public class PackedGrammar extends BatchGrammar {
 
     private float[] estimated;
     private float[] precomputable;
+    
+    private RandomAccessFile alignmentFile;
+    private MappedByteBuffer alignments;
+    private int[] alignmentLookup;
 
+    /**
+     * Provides a cache of packedTrie nodes to be used in getTrie.
+     */
     private HashMap<Integer, PackedTrie> tries;
 
     public PackedSlice(String prefix) throws IOException {
@@ -186,6 +339,7 @@ public class PackedGrammar extends BatchGrammar {
       File target_file = new File(prefix + ".target");
       File target_lookup_file = new File(prefix + ".target.lookup");
       File feature_file = new File(prefix + ".features");
+      File alignment_file = new File(prefix + ".alignments");
 
       // Get the channels etc.
       FileInputStream source_fis = new FileInputStream(source_file);
@@ -212,6 +366,24 @@ public class PackedGrammar extends BatchGrammar {
 
       features = feature_channel.map(MapMode.READ_ONLY, 0, feature_size);
       features.load();
+      
+      if (alignment_file.exists()) {
+        alignmentFile = new RandomAccessFile(alignment_file, "r");
+        FileChannel alignment_channel = alignmentFile.getChannel();
+        int alignment_size = (int) alignment_channel.size();
+        alignments = alignment_channel.map(MapMode.READ_ONLY, 0, alignment_size);
+        alignments.load();
+        
+        int num_blocks = alignments.getInt(0);
+        alignmentLookup = new int[num_blocks];
+        int header_pos = 8;
+        for (int i = 0; i < num_blocks; i++) {
+          alignmentLookup[i] = alignments.getInt(header_pos);
+          header_pos += 4;
+        }
+      } else {
+        alignments = null;
+      }
 
       int num_blocks = features.getInt(0);
       featureLookup = new int[num_blocks];
@@ -307,22 +479,34 @@ public class PackedGrammar extends BatchGrammar {
       StringBuilder sb = new StringBuilder();
       for (int i = 0; i < num_features; i++) {
         int feature_id = encoding.readId(features, feature_position);
-
         FloatEncoder encoder = encoding.encoder(feature_id);
-        if (encoding.isLabeled()) {
-          String name = Vocabulary.word(encoding.outerId(feature_id));
-          sb.append(String.format(" tm_%s_%s=%.5f", Vocabulary.word(owner), name,
-              encoder.read(features, feature_position)));
-        } else {
-          int index = encoding.outerId(feature_id);
+
+        String feature_name = Vocabulary.word(encoding.outerId(feature_id));
+        try {
+          int index = Integer.parseInt(feature_name);
           sb.append(String.format(" tm_%s_%d=%.5f", Vocabulary.word(owner), index,
-              encoder.read(features, feature_position)));
+              -encoder.read(features, feature_position)));
+        } catch (NumberFormatException e) {
+          sb.append(String.format(" %s=%.5f", feature_name, encoder.read(features, feature_position)));
         }
+
         feature_position += EncoderConfiguration.ID_SIZE + encoder.size();
       }
       return sb.toString().trim();
     }
 
+    private final byte[] getAlignmentArray(int block_id) {
+      if (alignments == null)
+        throw new RuntimeException("No alignments available.");
+      int alignment_position = alignmentLookup[block_id];
+      int num_points = (int) alignments.get(alignment_position);
+      byte[] alignment = new byte[num_points * 2];
+      
+      alignments.position(alignment_position + 1);
+      alignments.get(alignment, 0, num_points * 2);
+      return alignment;
+    }
+    
     private final PackedTrie root() {
       return getTrie(0);
     }
@@ -402,10 +586,12 @@ public class PackedGrammar extends BatchGrammar {
         return children;
       }
 
+      @Override
       public boolean hasExtensions() {
         return (source[position] != 0);
       }
 
+      @Override
       public ArrayList<? extends Trie> getExtensions() {
         int num_children = source[position];
         ArrayList<PackedTrie> tries = new ArrayList<PackedTrie>(num_children);
@@ -419,15 +605,18 @@ public class PackedGrammar extends BatchGrammar {
         return tries;
       }
 
+      @Override
       public boolean hasRules() {
         int num_children = source[position];
         return (source[position + 1 + 2 * num_children] != 0);
       }
 
+      @Override
       public RuleCollection getRuleCollection() {
         return this;
       }
 
+      @Override
       public List<Rule> getRules() {
         int num_children = source[position];
         int rule_position = position + 2 * (num_children + 1);
@@ -435,7 +624,10 @@ public class PackedGrammar extends BatchGrammar {
 
         ArrayList<Rule> rules = new ArrayList<Rule>(num_rules);
         for (int i = 0; i < num_rules; i++) {
-          rules.add(new PackedRule(rule_position + 3 * i));
+          if (type.equals("moses") || type.equals("phrase"))
+            rules.add(new PackedPhrasePair(rule_position + 3 * i));
+          else
+            rules.add(new PackedRule(rule_position + 3 * i));
         }
         return rules;
       }
@@ -466,7 +658,7 @@ public class PackedGrammar extends BatchGrammar {
           rules[i] = rule_position + 2 + 3 * i;
           block_id = source[rules[i]];
 
-          BilingualRule rule = new BilingualRule(source[rule_position + 3 * i], src,
+          Rule rule = new Rule(source[rule_position + 3 * i], src,
               getTarget(target_address), getFeatures(block_id), arity, owner);
           estimated[block_id] = rule.estimateRuleCost(models);
           precomputable[block_id] = rule.getPrecomputableCost();
@@ -478,7 +670,7 @@ public class PackedGrammar extends BatchGrammar {
             float b_cost = estimated[source[b]];
             if (a_cost == b_cost)
               return 0;
-            return (a_cost > b_cost ? 1 : -1);
+            return (a_cost > b_cost ? -1 : 1);
           }
         });
 
@@ -568,11 +760,83 @@ public class PackedGrammar extends BatchGrammar {
           throw new UnsupportedOperationException();
         }
       }
+      
+      /**
+       * A packed phrase pair represents a rule of the form of a phrase pair, packed with the
+       * grammar-packer.pl script, which simply adds a nonterminal [X] to the left-hand side of
+       * all phrase pairs (and converts the Moses features). The packer then packs these. We have
+       * to then put a nonterminal on the source and target sides to treat the phrase pairs like
+       * left-branching rules, which is how Joshua deals with phrase decoding. 
+       * 
+       * @author Matt Post <post@cs.jhu.edu>
+       *
+       */
+      public final class PackedPhrasePair extends PackedRule {
+        public PackedPhrasePair(int address) {
+          super(address);
+        }
 
-      public final class PackedRule extends Rule {
-        private final int address;
+        @Override
+        public int getArity() {
+          return PackedTrie.this.getArity() + 1;
+        }
+        
+        /**
+         * Take the English phrase of the underlying rule and prepend an [X].
+         * 
+         * @return
+         */
+        @Override
+        public int[] getEnglish() {
+          if (tgt == null) {
+            int[] phrase = getTarget(source[address + 1]);
+            tgt = new int[phrase.length + 1];
+            tgt[0] = -1;
+            for (int i = 0; i < phrase.length; i++)
+              tgt[i+1] = phrase[i];
+          }
+          return tgt;
+        }
 
-        private int[] tgt = null;
+        
+        /**
+         * Take the French phrase of the underlying rule and prepend an [X].
+         * 
+         * @return
+         */
+        @Override
+        public int[] getFrench() {
+          int phrase[] = new int[src.length + 1];
+          int ntid = Vocabulary.id(PackedGrammar.this.joshuaConfiguration.default_non_terminal);
+          phrase[0] = ntid;
+          System.arraycopy(src,  0, phrase, 1, src.length);
+          return phrase;
+        }
+        
+        /**
+         * Similarly the alignment array needs to be shifted over by one.
+         * 
+         * @return
+         */
+        @Override
+        public byte[] getAlignment() {
+          // alignments is the underlying raw alignment data
+          if (alignments != null) {
+            byte[] a = getAlignmentArray(source[address + 2]);
+            byte[] points = new byte[a.length + 2];
+            points[0] = points[1] = 0;
+            for (int i = 0; i < a.length; i++)
+              points[i + 2] = (byte) (a[i] + 1);
+            return points;
+          }
+          return null;
+        }
+      }
+
+      public class PackedRule extends Rule {
+        protected final int address;
+
+        protected int[] tgt = null;
         private FeatureVector features = null;
 
         public PackedRule(int address) {
@@ -630,16 +894,17 @@ public class PackedGrammar extends BatchGrammar {
         @Override
         public FeatureVector getFeatureVector() {
           if (features == null) {
-            features = new FeatureVector(getFeatures(source[address + 2]), "");
-            features.times(-1);
+            features = new FeatureVector(getFeatures(source[address + 2]), "tm_" + Vocabulary.word(owner) + "_");
           }
 
           return features;
         }
-
+        
         @Override
-        public void setEstimatedCost(float cost) {
-          estimated[source[address + 2]] = cost;
+        public byte[] getAlignment() {
+          if (alignments != null)
+            return getAlignmentArray(source[address + 2]);
+          return null;
         }
 
         @Override
@@ -647,10 +912,10 @@ public class PackedGrammar extends BatchGrammar {
           return estimated[source[address + 2]];
         }
 
-        @Override
-        public void setPrecomputableCost(float cost) {
-          precomputable[source[address + 2]] = cost;
-        }
+//        @Override
+//        public void setPrecomputableCost(float cost) {
+//          precomputable[source[address + 2]] = cost;
+//        }
 
         @Override
         public float getPrecomputableCost() {
@@ -681,7 +946,24 @@ public class PackedGrammar extends BatchGrammar {
 
   @Override
   public boolean isRegexpGrammar() {
-    // TODO Auto-generated method stub
     return false;
+  }
+
+  @Override
+  public void addOOVRules(int word, List<FeatureFunction> featureFunctions) {
+    throw new RuntimeException("PackedGrammar.addOOVRules(): I can't add OOV rules");
+  }
+  
+  @Override
+  public void addRule(Rule rule) {
+    throw new RuntimeException("PackedGrammar.addRule(): I can't add rules");
+  }
+  
+  private void readConfig(String config) throws IOException {
+    for (String line: new LineReader(config)) {
+      String[] tokens = line.split(" = ");
+      if (tokens[0].equals("max-source-len"))
+        this.maxSourcePhraseLength = Integer.parseInt(tokens[1]);
+    }
   }
 }

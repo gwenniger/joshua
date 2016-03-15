@@ -1,11 +1,11 @@
 package joshua.decoder.ff.tm;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map.Entry;
 import joshua.decoder.ff.tm.hash_based.ExtensionIterator;
+import joshua.decoder.ff.tm.hash_based.MemoryBasedBatchGrammar;
 import joshua.decoder.segment_file.Sentence;
 
 /**
@@ -15,8 +15,8 @@ import joshua.decoder.segment_file.Sentence;
  * 
  * @author Matt Post <post@cs.jhu.edu>
  */
-public class SentenceFilteredGrammar extends BatchGrammar {
-  private BatchGrammar baseGrammar;
+public class SentenceFilteredGrammar extends MemoryBasedBatchGrammar {
+  private AbstractGrammar baseGrammar;
   private SentenceFilteredTrie filteredTrie;
   private int[] tokens;
   private Sentence sentence;
@@ -28,11 +28,11 @@ public class SentenceFilteredGrammar extends BatchGrammar {
    * @param baseGrammar
    * @param sentence
    */
-  SentenceFilteredGrammar(BatchGrammar baseGrammar, Sentence sentence) {
+  SentenceFilteredGrammar(AbstractGrammar baseGrammar, Sentence sentence) {
     super(baseGrammar.joshuaConfiguration);
     this.baseGrammar = baseGrammar;
     this.sentence = sentence;
-    this.tokens = sentence.intSentence();
+    this.tokens = sentence.getWordIDs();
 
     int origCount = getNumRules(baseGrammar.getTrieRoot());
     long startTime = System.currentTimeMillis();
@@ -231,6 +231,7 @@ public class SentenceFilteredGrammar extends BatchGrammar {
    * 
    * @return the root of the filtered trie if any rules were retained, otherwise null
    */
+  @SuppressWarnings("unused")
   private SentenceFilteredTrie filter_regexp(Trie unfilteredTrie) {
     SentenceFilteredTrie trie = null;
 
@@ -280,7 +281,7 @@ public class SentenceFilteredGrammar extends BatchGrammar {
      * Constructor.
      * 
      * @param trieRoot
-     * @param sentence
+     * @param source
      */
     public SentenceFilteredTrie(Trie unfilteredTrieNode) {
       this.unfilteredTrieNode = unfilteredTrieNode;

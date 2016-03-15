@@ -5,7 +5,7 @@ package joshua.util;
  * over the length-n input sentence, 0 <= i <= j <= n. These charts are used for many things; for
  * example, lattices use a chart to denote whether there is a path between nodes i and j, and what
  * their costs is, and the decoder uses charts to record the partial application of rules (
- * {@link DotChart}) and the existence of proved items ({@link Chart}).
+ * {@link DotChart}) and the existence of proved items ({@link PhraseChart}).
  * 
  * The dummy way to implement a chart is to initialize a two-dimensional array; however, this wastes
  * a lot of space, because the constraint (i <= j) means that only half of this space can ever be
@@ -23,14 +23,14 @@ public class ChartSpan<Type> {
   int max;
 
   public ChartSpan(int w, Type defaultValue) {
+    //System.err.println(String.format("ChartSpan::ChartSpan(%d)", w));
     this.max = w;
 
     /* offset(max,max) is the last position in the array */
-    int size = offset(max, max);
-    chart = new Object[size];
+    chart = new Object[offset(max,max) + 1];
 
     /* Initialize all arcs to infinity, except self-loops, which have distance 0 */
-    for (int i = 0; i < size; i++)
+    for (int i = 0; i < chart.length; i++)
       chart[i] = defaultValue;
   }
   
@@ -53,10 +53,11 @@ public class ChartSpan<Type> {
    */
   private int offset(int i, int j) {
     if (i < 0 || j > max || i > j) {
-      System.err.println(String.format("* FATAL: Invalid span (%d,%d | %d)", i, j, max));
-      System.exit(31);
+      throw new RuntimeException(String.format("Invalid span (%d,%d | %d)", i, j, max));
     }
 
+    // System.err.println(String.format("ChartSpan::offset(%d,%d) = %d / %d", i, j, i * (max + 1) - i * (i + 1) / 2 + j, max * (max + 1) - max * (max + 1) / 2 + max));
+    
     return i * (max + 1) - i * (i + 1) / 2 + j;
   }
 
@@ -66,7 +67,7 @@ public class ChartSpan<Type> {
    * @param value
    */
   public void setDiagonal(Type value) {
-    for (int i = 0; i < max; i++)
+    for (int i = 0; i <= max; i++)
       set(i, i, value);
   }
 }

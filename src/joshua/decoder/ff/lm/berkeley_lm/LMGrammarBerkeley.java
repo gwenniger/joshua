@@ -1,26 +1,6 @@
-/*
- * This file is part of the Joshua Machine Translation System.
- * 
- * Joshua is free software; you can redistribute it and/or modify it under the terms of the GNU
- * Lesser General Public License as published by the Free Software Foundation; either version 2.1 of
- * the License, or (at your option) any later version.
- * 
- * This library is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
- * even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * Lesser General Public License for more details.
- * 
- * You should have received a copy of the GNU Lesser General Public License along with this library;
- * if not, write to the Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
- * 02111-1307 USA
- */
 package joshua.decoder.ff.lm.berkeley_lm;
 
-import java.io.BufferedInputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.StreamCorruptedException;
 import java.util.Arrays;
 import java.util.logging.Handler;
 import java.util.logging.Level;
@@ -28,6 +8,7 @@ import java.util.logging.Logger;
 
 import joshua.corpus.Vocabulary;
 import joshua.decoder.ff.lm.DefaultNGramLanguageModel;
+import joshua.decoder.Decoder;
 import edu.berkeley.nlp.lm.ArrayEncodedNgramLanguageModel;
 import edu.berkeley.nlp.lm.ConfigOptions;
 import edu.berkeley.nlp.lm.StringWordIndexer;
@@ -42,8 +23,6 @@ import edu.berkeley.nlp.lm.util.StrUtils;
  * @author adpauls@gmail.com
  */
 public class LMGrammarBerkeley extends DefaultNGramLanguageModel {
-
-
 
   private ArrayEncodedNgramLanguageModel<String> lm;
 
@@ -71,15 +50,8 @@ public class LMGrammarBerkeley extends DefaultNGramLanguageModel {
     super(order);
     vocabIdToMyIdMapping = new int[10];
 
-
-    // determine whether the file is in its binary format
-    boolean fileIsBinary = true;
-    try {
-      new ObjectInputStream(new BufferedInputStream(new FileInputStream(new File(lm_file))));
-    } catch (StreamCorruptedException e) {
-      fileIsBinary = false;
-    } catch (IOException e) {
-      System.err.println("Can't read file '" + lm_file + "'");
+    if (!new File(lm_file).exists()) {
+      System.err.println("Can't read lm_file '" + lm_file + "'");
       System.exit(1);
     }
 
@@ -88,12 +60,13 @@ public class LMGrammarBerkeley extends DefaultNGramLanguageModel {
       logger.setLevel(Level.FINEST);
       logger.setUseParentHandlers(false);
     }
-    if (fileIsBinary) {
-      logger.info("Loading Berkeley LM from binary " + lm_file);
+
+    try { // try binary format (even gzipped)
       lm = (ArrayEncodedNgramLanguageModel<String>) LmReaders.<String>readLmBinary(lm_file);
-    } else {
+      Decoder.LOG(1, "Loading Berkeley LM from binary " + lm_file);
+    } catch (RuntimeException e) {
       ConfigOptions opts = new ConfigOptions();
-      logger.info("Loading Berkeley LM from ARPA file " + lm_file);
+      Decoder.LOG(1, "Loading Berkeley LM from ARPA file " + lm_file);
       final StringWordIndexer wordIndexer = new StringWordIndexer();
       ArrayEncodedNgramLanguageModel<String> berkeleyLm =
           LmReaders.readArrayEncodedLmFromArpa(lm_file, false, wordIndexer, opts, order);
@@ -191,10 +164,5 @@ public class LMGrammarBerkeley extends DefaultNGramLanguageModel {
   @Override
   public float ngramLogProbability(int[] ngram, int order) {
     return ngramLogProbability(ngram);
-  }
-
-  @Override
-  public boolean isMinimizing() {
-    return false;
   }
 }

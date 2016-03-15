@@ -1,11 +1,9 @@
 package joshua.oracle;
 
-import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 
 import joshua.corpus.Vocabulary;
 import joshua.decoder.JoshuaConfiguration;
@@ -17,6 +15,7 @@ import joshua.decoder.hypergraph.HyperGraph;
 import joshua.decoder.hypergraph.KBestExtractor;
 import joshua.decoder.hypergraph.ViterbiExtractor;
 import joshua.util.FileUtility;
+import joshua.util.io.LineReader;
 
 /**
  * approximated BLEU (1) do not consider clipping effect (2) in the dynamic programming, do not
@@ -81,7 +80,7 @@ public class OracleExtractionHG extends SplitHg {
   /*
    * for 919 sent, time_on_reading: 148797 time_on_orc_extract: 580286
    */
-  @SuppressWarnings({ "deprecation", "unused" })
+  @SuppressWarnings({ "unused" })
   public static void main(String[] args) throws IOException {
     JoshuaConfiguration joshuaConfiguration = new JoshuaConfiguration();
     /*
@@ -127,16 +126,14 @@ public class OracleExtractionHG extends SplitHg {
     long start_time0 = System.currentTimeMillis();
     long time_on_reading = 0;
     long time_on_orc_extract = 0;
-    BufferedReader t_reader_ref = FileUtility.getReadFileStream(f_ref_files);
     // DiskHyperGraph dhg_read = new DiskHyperGraph(baseline_lm_feat_id, true, null);
 
     // dhg_read.initRead(f_hypergraphs, f_rule_tbl, null);
 
     OracleExtractionHG orc_extractor = new OracleExtractionHG(baseline_lm_feat_id);
-    String ref_sent = null;
     long start_time = System.currentTimeMillis();
     int sent_id = 0;
-    while ((ref_sent = FileUtility.read_line_lzf(t_reader_ref)) != null) {
+    for (String ref_sent: new LineReader(f_ref_files)) {
       System.out.println("############Process sentence " + sent_id);
       start_time = System.currentTimeMillis();
       sent_id++;
@@ -159,7 +156,7 @@ public class OracleExtractionHG extends SplitHg {
         orc_sent = (String) res[0];
         orc_bleu = (Double) res[1];
       } else {
-        HyperGraph hg_oracle = orc_extractor.oracle_extract_hg(hg, hg.sentLen, lm_order, ref_sent);
+        HyperGraph hg_oracle = orc_extractor.oracle_extract_hg(hg, hg.sentLen(), lm_order, ref_sent);
         orc_sent = ViterbiExtractor.extractViterbiString(hg_oracle.goalNode);
         orc_bleu = orc_extractor.get_best_goal_cost(hg, orc_extractor.g_tbl_split_virtual_items);
 
@@ -172,7 +169,6 @@ public class OracleExtractionHG extends SplitHg {
       orc_out.write(orc_sent + "\n");
       System.out.println("orc bleu is " + orc_bleu);
     }
-    t_reader_ref.close();
     orc_out.close();
 
     System.out.println("time_on_reading: " + time_on_reading);
@@ -368,7 +364,7 @@ public class OracleExtractionHG extends SplitHg {
     // #### get left_state_sequence, right_state_sequence, total_hyp_len, num_ngram_match
     for (int c = 0; c < en_words.length; c++) {
       int c_id = en_words[c];
-      if (Vocabulary.idx(c_id)) {
+      if (Vocabulary.nt(c_id)) {
         int index = -(c_id + 1);
         DPStateOracle ant_state = (DPStateOracle) l_ant_virtual_item.get(index).dp_state;
         total_hyp_len += ant_state.best_len;
@@ -457,14 +453,6 @@ public class OracleExtractionHG extends SplitHg {
     return new DPStateOracle(total_hyp_len, num_ngram_match, left_lm_state, right_lm_state);
   }
 
-  private int[] intListToArray(List<Integer> words) {
-    int[] res = new int[words.size()];
-    int i = 0;
-    for (int wrd : words)
-      res[i++] = wrd;
-    return res;
-  }
-
   private int[] get_left_equiv_state(ArrayList<Integer> left_state_sequence,
       HashMap<String, Boolean> tbl_suffix) {
     int l_size = (left_state_sequence.size() < g_bleu_order - 1) ? left_state_sequence.size()
@@ -504,19 +492,6 @@ public class OracleExtractionHG extends SplitHg {
         suffix.append(' ');
     }
     return (Boolean) tbl_suffix.containsKey(suffix.toString());
-  }
-
-  // TODO: never called. remove?
-  private boolean is_a_suffix_in_grammar(ArrayList<Integer> left_state_sequence, int start_pos,
-      int end_pos, PrefixGrammar grammar_suffix) {
-    if ((Integer) left_state_sequence.get(end_pos) == this.NULL_LEFT_LM_STATE_SYM_ID) {
-      return false;
-    }
-    ArrayList<Integer> suffix = new ArrayList<Integer>();
-    for (int i = end_pos; i >= start_pos; i--) { // right-most first
-      suffix.add(left_state_sequence.get(i));
-    }
-    return grammar_suffix.contain_ngram(suffix, 0, suffix.size() - 1);
   }
 
   private int[] get_right_equiv_state(ArrayList<Integer> right_state_sequence,
@@ -562,15 +537,6 @@ public class OracleExtractionHG extends SplitHg {
         prefix.append(' ');
     }
     return (Boolean) tbl_prefix.containsKey(prefix.toString());
-  }
-
-  // TODO: never called. remove?
-  private boolean isAPrefixInGrammar(ArrayList<Integer> right_state_sequence, int start_pos,
-      int end_pos, PrefixGrammar gr_prefix) {
-    if (right_state_sequence.get(start_pos) == this.NULL_RIGHT_LM_STATE_SYM_ID) {
-      return false;
-    }
-    return gr_prefix.contain_ngram(right_state_sequence, start_pos, end_pos);
   }
 
   public static void compare_two_int_arrays(int[] a, int[] b) {
@@ -714,15 +680,6 @@ public class OracleExtractionHG extends SplitHg {
     return res_bleu;
   }
 
-  // TODO: never called, remove?
-  private static void printState(Object[] state) {
-    System.out.println("State is");
-    for (int i = 0; i < state.length; i++) {
-      System.out.print(state[i] + " ---- ");
-    }
-    System.out.println();
-  }
-
   // #### equivalent lm stuff ############
   public static void setup_prefix_suffix_tbl(int[] wrds, int order,
       HashMap<String, Boolean> prefix_tbl, HashMap<String, Boolean> suffix_tbl) {
@@ -795,7 +752,8 @@ public class OracleExtractionHG extends SplitHg {
         }
       }
     }
-
+    
+    @SuppressWarnings("unused")
     public boolean contain_ngram(ArrayList<Integer> wrds, int start_pos, int end_pos) {
       if (end_pos < start_pos)
         return false;

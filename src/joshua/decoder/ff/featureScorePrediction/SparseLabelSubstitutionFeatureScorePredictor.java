@@ -53,7 +53,7 @@ public class SparseLabelSubstitutionFeatureScorePredictor implements FeatureScor
       if (isRelevantFeature(featureTypePrefix, featureString)) {
         SparseSubstitutionDescription substitutionPair = SparseSubstitutionDescription
             .creatSparseSubstitutionDescription(featureTypePrefix, featureString);
-        Float score = featureVector.get(featureString);
+        Float score = featureVector.getWeight(featureString);
         result.put(substitutionPair, score);
       }
     }

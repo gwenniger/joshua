@@ -1,17 +1,18 @@
 package joshua.decoder.ff;
-
+/***
+ * @author Gideon Wenniger
+ */
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-
 import org.junit.Assert;
-
 import joshua.decoder.JoshuaConfiguration;
 import joshua.decoder.chart_parser.NonterminalMatcher;
 import joshua.decoder.chart_parser.SourcePath;
 import joshua.decoder.ff.state_maintenance.DPState;
 import joshua.decoder.ff.tm.Rule;
 import joshua.decoder.hypergraph.HGNode;
+import joshua.decoder.segment_file.Sentence;
 import joshua.util.ListUtil;
 
 public abstract class LabelSubstitutionFF extends StatelessFF {
@@ -22,6 +23,9 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
   private static final String STANDARD_LABEL_SUBSTITUTION_SPARSE_FEATURE_FUNCTION_NAME = "LabelSubstitutionSparse";
   private static final String DOUBLE_LABEL_SMOOTHED_LABEL_SUBSTITUTION_BASIC_FEATURE_FUNCTION_NAME = "LabelSubstitutionDoubleLabel";
   private static final String DOUBLE_LABEL_SMOOTHED_LABEL_SUBSTITUTION_SPARSE_FEATURE_FUNCTION_NAME = "LabelSubstitutionDoubleLabelSparse";
+//=======
+//public class LabelSubstitutionFF extends StatelessFF {
+//>>>>>>> 090cb8c5287c85bec08ba4b48c16088e2b9a8449
   private static final String MATCH_SUFFIX = "MATCH";
   private static final String NO_MATCH_SUFFIX = "NOMATCH";
   private static final String SPARSE_FEATURE_LHS_TAG = "LHS";
@@ -32,16 +36,30 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
   private static final String FUZZY_MATCHING_GLUE_GRAMMAR_NONTERIMINAL = "[X]";
 
   private final JoshuaConfiguration joshuaConfiguration;
-  private final List<LabelSubstitutionLabelSmoother> labelSmoothersList;
+  protected  List<LabelSubstitutionLabelSmoother> labelSmoothersList;
 
+  /*
   private LabelSubstitutionFF(FeatureVector weights, String name,
       JoshuaConfiguration joshuaConfiguration,
       List<LabelSubstitutionLabelSmoother> labelSmoothersList) {
     super(weights, name);
     this.joshuaConfiguration = joshuaConfiguration;
     this.labelSmoothersList = labelSmoothersList;
+  }*/
+
+  public LabelSubstitutionFF(FeatureVector weights, String[] args, JoshuaConfiguration config) {
+    super(weights, "LabelSubstitution", args, config);
+    this.joshuaConfiguration = config;
+    this.labelSmoothersList = null;
   }
 
+  protected LabelSubstitutionFF(FeatureVector weights, String[] args, JoshuaConfiguration config, String featureName) {
+    super(weights, featureName, args, config);
+    this.joshuaConfiguration = config;
+    this.labelSmoothersList = null;
+  }
+  
+  
   public static LabelSubstitutionBasicFF createStandardLabelSubstitutionFF(FeatureVector weights,
       JoshuaConfiguration joshuaConfiguration) {
     return new LabelSubstitutionBasicFF(weights, getFeatureNameStandardFeature(),
@@ -100,9 +118,13 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
     result.add(new FirstSublabelOnlyLabelSubstitutionLabelSmoother());
     result.add(new LastSublabelOnlyLabelSubstitutionLabelSmoother());
     return result;
+  }  
+
+  public String getLowerCasedFeatureName() {
+    return name.toLowerCase();
   }
 
-  public static String getMatchFeatureSuffix(String ruleNonterminal, String substitutionNonterminal) {
+  public String getMatchFeatureSuffix(String ruleNonterminal, String substitutionNonterminal) {
     if (ruleNonterminal.equals(substitutionNonterminal)) {
       return MATCH_SUFFIX;
     } else {
@@ -359,7 +381,7 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
 
   @Override
   public DPState compute(Rule rule, List<HGNode> tailNodes, int i, int j, SourcePath sourcePath,
-      int sentID, Accumulator acc) {
+      Sentence sentence, Accumulator acc) {
     if (rule != null && (tailNodes != null)) {
 
       for (LabelSubstitutionLabelSmoother labelSubstitutionLabelSmoother : this.labelSmoothersList) {
@@ -397,9 +419,9 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
    * @return
    */
   public double computeScoreThisFeatureOnly(Rule rule, List<HGNode> tailNodes, int i, int j,
-      SourcePath sourcePath, int sentID) {
+      SourcePath sourcePath, Sentence sentence) {
     ScoreAccumulator scoreAccumulator = new ScoreAccumulator();
-    compute(rule, tailNodes, i, j, sourcePath, sentID, scoreAccumulator);
+    compute(rule, tailNodes, i, j, sourcePath, sentence, scoreAccumulator);
     return scoreAccumulator.getScore();
   }
 
@@ -429,10 +451,16 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
   }
 
   private static class LabelSubstitutionBasicFF extends LabelSubstitutionFF {
+    
+    public LabelSubstitutionBasicFF (FeatureVector weights, String[] args, JoshuaConfiguration config) {
+      super(weights, args, config, "LabelSubstitutionBasic");
+    }
+    
     private LabelSubstitutionBasicFF(FeatureVector weights, String name,
         JoshuaConfiguration joshuaConfiguration,
         List<LabelSubstitutionLabelSmoother> labelSmoothersList) {
-      super(weights, name, joshuaConfiguration, labelSmoothersList);
+          super(weights, new String[0], joshuaConfiguration, "LabelSubstitutionBasic");
+          this.labelSmoothersList = labelSmoothersList;
     }
 
     protected void addFeatures(Accumulator acc,
@@ -445,12 +473,18 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
   }
 
   private static class LabelSubstitutionSparseFF extends LabelSubstitutionFF {
+  
+    public LabelSubstitutionSparseFF (FeatureVector weights, String[] args, JoshuaConfiguration config) {
+      super(weights, args, config, "LabelSubstitutionSparse");
+    }
+
     private LabelSubstitutionSparseFF(FeatureVector weights, String name,
         JoshuaConfiguration joshuaConfiguration,
         List<LabelSubstitutionLabelSmoother> labelSmoothersList) {
-      super(weights, name, joshuaConfiguration, labelSmoothersList);
+          super(weights, new String[0], joshuaConfiguration, "LabelSubstitutionSparse");
+          this.labelSmoothersList = labelSmoothersList;
     }
-
+    
     protected void addFeatures(Accumulator acc,
         LabelSubstitutionLabelSmoother labelSubstitutionLabelSmoother,
         List<String> ruleSourceNonterminals, List<String> substitutionNonterminals, Rule rule,

@@ -1,42 +1,38 @@
 package joshua.decoder;
 
-import java.io.BufferedWriter;
+import java.io.BufferedWriter;	
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.FileNotFoundException;
+import java.lang.reflect.Constructor;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
-import java.util.logging.Logger;
 
 import joshua.corpus.Vocabulary;
 import joshua.decoder.ff.FeatureVector;
+import joshua.decoder.JoshuaConfiguration.INPUT_TYPE;
+import joshua.decoder.JoshuaConfiguration.SERVER_TYPE;
 import joshua.decoder.ff.FeatureFunction;
-import joshua.decoder.ff.ArityPhrasePenaltyFF;
-import joshua.decoder.ff.LabelCombinationFF;
-import joshua.decoder.ff.LabelSubstitutionFF;
-import joshua.decoder.ff.OOVFF;
-import joshua.decoder.ff.PhraseModelFF;
-import joshua.decoder.ff.SourcePathFF;
-import joshua.decoder.ff.WordPenaltyFF;
-import joshua.decoder.ff.featureScorePrediction.FeatureScorePredictor;
-import joshua.decoder.ff.featureScorePrediction.LabelSubstitutionFFAndFFPredictionCreater;
-import joshua.decoder.ff.lm.KenLMFF;
-import joshua.decoder.ff.lm.LanguageModelFF;
-import joshua.decoder.ff.lm.NGramLanguageModel;
-import joshua.decoder.ff.lm.berkeley_lm.LMGrammarBerkeley;
-import joshua.decoder.ff.lm.kenlm.jni.KenLM;
-import joshua.decoder.ff.similarity.EdgePhraseSimilarityFF;
+import joshua.decoder.ff.PhraseModel;
 import joshua.decoder.ff.tm.Grammar;
-import joshua.decoder.ff.tm.GrammarFactory;
+import joshua.decoder.ff.tm.Rule;
+import joshua.decoder.ff.tm.Trie;
+import joshua.decoder.ff.tm.format.HieroFormatReader;
 import joshua.decoder.ff.tm.hash_based.MemoryBasedBatchGrammar;
 import joshua.decoder.ff.tm.hash_based.MemoryBasedBatchGrammarEfficientNonterminalLookup;
 import joshua.decoder.ff.tm.packed.PackedGrammar;
-import joshua.decoder.io.TranslationRequest;
+import joshua.decoder.io.JSONMessage;
+import joshua.decoder.io.TranslationRequestStream;
+import joshua.decoder.phrase.PhraseTable;
 import joshua.decoder.segment_file.Sentence;
 import joshua.util.FileUtility;
+import joshua.util.FormatUtils;
 import joshua.util.Regex;
 import joshua.util.io.LineReader;
 
@@ -47,11 +43,13 @@ import joshua.util.io.LineReader;
  * decodeAll(TranslationRequest), which returns a set of Translation objects wrapped in an iterable
  * Translations object. It is important that we support multithreading both (a) across the sentences
  * within a request and (b) across requests, in a round-robin fashion. This is done by maintaining a
- * fixed sized concurrent thread pool. When a new request comes in, a RequestHandler thread is
- * launched. This object reads iterates over the request's sentences, obtaining a thread from the
+ * fixed sized concurrent thread pool. When a new request comes in, a RequestParallelizer thread is
+ * launched. This object iterates over the request's sentences, obtaining a thread from the
  * thread pool, and using that thread to decode the sentence. If a decoding thread is not available,
- * it will block until one is in a fair (FIFO) manner. This maintains fairness across requests so
- * long as each request only requests thread when it has a sentence ready.
+ * it will block until one is in a fair (FIFO) manner. RequestParallelizer thereby permits intra-request
+ * parallelization by separating out reading the input stream from processing the translated sentences,
+ * but also ensures that round-robin parallelization occurs, since RequestParallelizer uses the
+ * thread pool before translating each request.
  * 
  * A decoding thread is handled by DecoderThread and launched from DecoderThreadRunner. The purpose
  * of the runner is to record where to place the translated sentence when it is done (i.e., which
@@ -73,16 +71,15 @@ public class Decoder {
    * overhead, but it can be problematic because of unseen dependencies (for example, in the
    * Vocabulary shared by language model, translation grammar, etc).
    */
-  private final List<GrammarFactory> grammarFactories;
+  private List<Grammar> grammars;
   private ArrayList<FeatureFunction> featureFunctions;
-  private ArrayList<NGramLanguageModel> languageModels;
+  private PhraseTable customPhraseTable;
 
   /* The feature weights. */
   public static FeatureVector weights;
     
 
-  /** Logger for this class. */
-  private static final Logger logger = Logger.getLogger(Decoder.class.getName());
+  public static int VERBOSE = 1;
 
   private BlockingQueue<DecoderThread> threadPool = null;
 
@@ -90,14 +87,12 @@ public class Decoder {
   // Constructors
   // ===============================================================
 
-  
   /**
    * Constructor method that creates a new decoder using the specified configuration file.
    * 
    * @param configFile Name of configuration file.
    */
   public Decoder(JoshuaConfiguration joshuaConfiguration, String configFile) {
-
     this(joshuaConfiguration);
     this.initialize(configFile);
   }
@@ -121,9 +116,10 @@ public class Decoder {
    */
   private Decoder(JoshuaConfiguration joshuaConfiguration) {
     this.joshuaConfiguration = joshuaConfiguration;
-    this.grammarFactories = new ArrayList<GrammarFactory>();
+    this.grammars = new ArrayList<Grammar>();
     this.threadPool = new ArrayBlockingQueue<DecoderThread>(
         this.joshuaConfiguration.num_parallel_decoders, true);
+    this.customPhraseTable = null;
   }
 
   /**
@@ -140,40 +136,6 @@ public class Decoder {
   // Public Methods
   // ===============================================================
 
-  public void changeBaselineFeatureWeights(FeatureVector weights) {
-    changeFeatureWeightVector(weights);
-  }
-
-  /**
-   * aSets the feature weight values used by the decoder.
-   * 
-   * @param weights Feature weight values
-   */
-  public void changeFeatureWeightVector(FeatureVector newWeights) {
-    if (newWeights != null) {
-
-      for (String feature : Decoder.weights.keySet()) {
-        float oldWeight = Decoder.weights.get(feature);
-        float newWeight = newWeights.get(feature);
-        Decoder.weights.put(feature, newWeights.get(feature));
-        logger.info(String.format("Feature %s: weight changed from %.3f to %.3f", feature,
-            oldWeight, newWeight));
-      }
-    }
-
-    /*
-     * TODO: we need to clear out the entire trie of positive sorting markings.
-     */
-    System.err
-        .println("* FATAL: changing the feature weights won't work until you clear the sorted settings for the complete trie");
-    System.exit(1);
-    for (GrammarFactory grammarFactory : this.grammarFactories) {
-      // if (grammarFactory instanceof Grammar) {
-      grammarFactory.getGrammarForSentence(null).sortGrammar(this.featureFunctions);
-      // }
-    }
-  }
-
   /**
    * This class is responsible for getting sentences from the TranslationRequest and procuring a
    * DecoderThreadRunner to translate it. Each call to decodeAll(TranslationRequest) launches a
@@ -183,16 +145,22 @@ public class Decoder {
    * @author Matt Post <post@cs.jhu.edu>
    * 
    */
-  private class RequestHandler extends Thread {
+  private class RequestParallelizer extends Thread {
     /* Source of sentences to translate. */
-    private final TranslationRequest request;
+    private final TranslationRequestStream request;
 
     /* Where to put translated sentences. */
     private final Translations response;
-
-    RequestHandler(TranslationRequest request, Translations response) {
+    
+    /* Sometimes we need to communicate with the client even when we didn't get a new sentence
+     * (e.g., metadata)
+     */
+    private OutputStream out;
+    
+    RequestParallelizer(TranslationRequestStream request, Translations response, OutputStream out) {
       this.request = request;
       this.response = response;
+      this.out = out;
     }
 
     @Override
@@ -204,7 +172,20 @@ public class Decoder {
        * allows parallelization across the sentences of the request.
        */
       for (;;) {
-        Sentence sentence = request.next();
+        Sentence sentence = null;
+        try {
+          sentence = request.next();
+          
+        } catch (MetaDataException meta) {
+          try {
+            handleMetadata(meta);
+          } catch (IOException e) {
+            e.printStackTrace();
+          }
+
+          continue;
+        }
+        
         if (sentence == null) {
           response.finish();
           break;
@@ -214,6 +195,149 @@ public class Decoder {
         DecoderThread thread = Decoder.this.getThread();
         new DecoderThreadRunner(thread, sentence, response).start();
       }
+    }
+
+    /**
+     * When metadata is found on the input, it needs to be processed. That is done here. Sometimes
+     * this involves returning data to the client.
+     * 
+     * @param meta
+     * @throws IOException
+     */
+    private void handleMetadata(MetaDataException meta) throws IOException {
+      if (meta.type().equals("set_weight")) {
+        // Change a decoder weight
+        String[] tokens = meta.tokens();
+        if (tokens.length != 3) {
+          System.err.println("* Error: weight change requires three tokens");
+        } else {
+          float old_weight = Decoder.weights.getWeight(tokens[1]);
+          Decoder.weights.set(tokens[1], Float.parseFloat(tokens[2]));
+          System.err.println(String.format("@set_weight: %s %.3f -> %.3f", 
+              tokens[1], old_weight,
+              Decoder.weights.getWeight(tokens[1])));
+        }
+        
+        // TODO: return a JSON object with this weight or all weights
+        out.write("".getBytes());
+
+      } else if (meta.type().equals("get_weight")) {
+        // TODO: add to JSON object, send back
+        
+        String[] tokens = meta.tokens();
+        
+        System.err.println(String.format("%s = %f", tokens[1], Decoder.weights.getWeight(tokens[1])));
+
+        out.write("".getBytes());
+                
+      } else if (meta.type().equals("add_rule")) {
+        String tokens[] = meta.tokens(" \\|\\|\\| ");
+
+        if (tokens.length != 2) {
+          System.err.println("* INVALID RULE '" + meta.tokenString() + "'");;
+          out.write("bad rule".getBytes());
+          return;
+        }
+
+        Rule rule = new HieroFormatReader().parseLine(
+            String.format("[X] ||| [X,1] %s ||| [X,1] %s ||| custom=1", tokens[0], tokens[1]));
+        Decoder.this.customPhraseTable.addRule(rule);
+        rule.estimateRuleCost(featureFunctions);
+        Decoder.LOG(1, String.format("Added custom rule %s", formatRule(rule)));
+        
+        String response = String.format("Added rule %s", formatRule(rule));
+        out.write(response.getBytes());
+
+      } else if (meta.type().equals("list_rules")) {
+        
+        JSONMessage message = new JSONMessage();
+        
+        // Walk the the grammar trie
+        ArrayList<Trie> nodes = new ArrayList<Trie>();
+        nodes.add(customPhraseTable.getTrieRoot());
+        
+        while (nodes.size() > 0) {
+          Trie trie = nodes.remove(0);
+          
+          if (trie == null)
+            continue;
+
+          if (trie.hasRules()) {
+            for (Rule rule: trie.getRuleCollection().getRules()) {
+              message.addRule(formatRule(rule));
+            }
+          }
+
+          if (trie.getExtensions() != null)
+            nodes.addAll(trie.getExtensions());
+        }
+        
+        out.write(message.toString().getBytes());
+        
+      } else if (meta.type().equals("remove_rule")) {
+        // Remove a rule from a custom grammar, if present
+        String[] tokens = meta.tokenString().split(" \\|\\|\\| ");
+        if (tokens.length != 2) {
+          out.write(String.format("Invalid delete request: '%s'", meta.tokenString()).getBytes());
+          return;
+        }
+
+        // Search for the rule in the trie
+        int nt_i = Vocabulary.id(joshuaConfiguration.default_non_terminal);
+        Trie trie = customPhraseTable.getTrieRoot().match(nt_i);
+
+        for (String word: tokens[0].split("\\s+")) {
+          int id = Vocabulary.id(word);
+          Trie nextTrie = trie.match(id);
+          if (nextTrie != null)
+            trie = nextTrie;
+        }
+
+        if (trie.hasRules()) {
+          Rule matched = null;
+          for (Rule rule: trie.getRuleCollection().getRules()) {
+            String target = rule.getEnglishWords();
+            target = target.substring(target.indexOf(' ') + 1);
+            
+            if (tokens[1].equals(target)) {
+              matched = rule;
+              break;
+            }
+          }
+          trie.getRuleCollection().getRules().remove(matched);
+          out.write(String.format("Removed rule %s", formatRule(matched)).getBytes());
+          return;
+        }
+        
+        out.write(String.format("No such rule %s", meta.tokenString()).getBytes());
+      }
+    }
+
+    /**
+     * Strips the nonterminals from the lefthand side of the rule.
+     * 
+     * @param rule
+     * @return
+     */
+    private String formatRule(Rule rule) {
+      String ruleString = "";
+      boolean first = true;
+      for (int word: rule.getFrench()) {
+        if (!first)
+          ruleString += " " + Vocabulary.word(word);
+        first = false;
+      }
+      
+      ruleString += " |||"; // space will get added with first English word
+      first = true;
+      for (int word: rule.getEnglish()) {
+        if (!first)
+          ruleString += " " + Vocabulary.word(word);
+        first = false;
+      }
+
+      // strip of the leading space
+      return ruleString.substring(1);
     }
   }
 
@@ -263,19 +387,21 @@ public class Decoder {
        * Use the thread to translate the sentence. Then record the translation with the
        * corresponding Translations object, and return the thread to the pool.
        */
-      Translation translation = decoderThread.translate(this.sentence);
-      translations.record(translation);
       try {
+        Translation translation = decoderThread.translate(this.sentence);
+        translations.record(translation);
+
         /*
          * This is crucial! It's what makes the thread available for the next sentence to be
          * translated.
          */
         threadPool.put(decoderThread);
-      } catch (InterruptedException e) {
-        // TODO Auto-generated catch block
-        System.err
-            .println("* WARNING: I encountered an error trying to return the decoder thread.");
+      } catch (Exception e) {
+        System.err.println(String.format(
+            "Input %d: FATAL UNCAUGHT EXCEPTION: %s", sentence.id(), e.getMessage()));
         e.printStackTrace();
+        System.exit(1);;
+//        translations.record(new Translation(sentence, null, featureFunctions, joshuaConfiguration));
       }
     }
   }
@@ -287,14 +413,52 @@ public class Decoder {
    * 
    * @param request
    * @return an iterable set of Translation objects
+   * @throws IOException 
    */
-  public Translations decodeAll(TranslationRequest request) {
+  public void decodeAll(TranslationRequestStream request, OutputStream out) throws IOException {
     Translations translations = new Translations(request);
 
-    new RequestHandler(request, translations).start();
+    /* Start a thread to handle requests on the input stream */
+    new RequestParallelizer(request, translations, out).start();
+    
+    for (;;) {
+      Translation translation = translations.next();
+      if (translation == null)
+        break;
 
-    return translations;
+      if (joshuaConfiguration.input_type == INPUT_TYPE.json || joshuaConfiguration.server_type == SERVER_TYPE.HTTP) {
+        JSONMessage message = JSONMessage.buildMessage(translation);
+        out.write(message.toString().getBytes());
+        
+      } else {
+        /**
+         * We need to munge the feature value outputs in order to be compatible with Moses tuners.
+         * Whereas Joshua writes to STDOUT whatever is specified in the `output-format` parameter,
+         * Moses expects the simple translation on STDOUT and the n-best list in a file with a fixed
+         * format.
+         */
+        String text;
+        if (joshuaConfiguration.moses) {
+          text = translation.toString().replaceAll("=", "= ");
+          // Write the complete formatted string to STDOUT
+          if (joshuaConfiguration.n_best_file != null)
+            out.write(text.getBytes());
+          
+          // Extract just the translation and output that to STDOUT
+          text = text.substring(0,  text.indexOf('\n'));
+          String[] fields = text.split(" \\|\\|\\| ");
+          text = fields[1] + "\n";
+          
+        } else {
+          text = translation.toString();
+        }
+
+        out.write(text.getBytes());
+      }
+      out.flush();
+    }
   }
+
 
   /**
    * We can also just decode a single sentence.
@@ -355,7 +519,8 @@ public class Decoder {
 
             if (newDiscriminativeModel != null && "discriminative".equals(fds[0])) {
               newSent.append(fds[0]).append(' ');
-              newSent.append(newDiscriminativeModel).append(' ');// change the file name
+              newSent.append(newDiscriminativeModel).append(' ');// change the
+                                                                 // file name
               for (int i = 2; i < fds.length - 1; i++) {
                 newSent.append(fds[i]).append(' ');
               }
@@ -392,6 +557,23 @@ public class Decoder {
   // ===============================================================
 
   /**
+   * Moses requires the pattern .*_.* for sparse features, and prohibits underscores in dense features. 
+   * This conforms to that pattern. We assume non-conforming dense features start with tm_ or lm_,
+   * and the only sparse feature that needs converting is OOVPenalty.
+   * 
+   * @param feature
+   * @return the feature in Moses format
+   */
+  private String mosesize(String feature) {
+    if (joshuaConfiguration.moses) {
+      if (feature.startsWith("tm_") || feature.startsWith("lm_"))
+        return feature.replace("_", "-");
+    }
+    
+    return feature;
+  }
+  
+  /**
    * Initialize all parts of the JoshuaDecoder.
    * 
    * @param configFile File containing configuration options
@@ -402,20 +584,36 @@ public class Decoder {
 
       long pre_load_time = System.currentTimeMillis();
 
-      /*
-       * Weights can be listed in a separate file (denoted by parameter "weights-file") or directly
+      /* Weights can be listed in a separate file (denoted by parameter "weights-file") or directly
        * in the Joshua config file. Config file values take precedent.
        */
-      Decoder.weights = this.readWeights(joshuaConfiguration.weights_file);
+      this.readWeights(joshuaConfiguration.weights_file);
+      
+      
+      /* Add command-line-passed weights to the weights array for processing below */
+      if (joshuaConfiguration.weight_overwrite != "") {
+        String[] tokens = joshuaConfiguration.weight_overwrite.split("\\s+");
+        for (int i = 0; i < tokens.length; i += 2) {
+          String feature = tokens[i];
+          float value = Float.parseFloat(tokens[i+1]);
+          
+          if (joshuaConfiguration.moses)
+            feature = demoses(feature);
+          
+          joshuaConfiguration.weights.add(String.format("%s %s", feature, tokens[i+1]));
+          Decoder.LOG(1, String.format("COMMAND LINE WEIGHT: %s -> %.3f", feature, value));
+        }
+      }
 
-      for (int i = 0; i < joshuaConfiguration.weights.size(); i++) {
-        String pair[] = joshuaConfiguration.weights.get(i).split("\\s+");
+      /* Read the weights found in the config file */
+      for (String pairStr: joshuaConfiguration.weights) {
+        String pair[] = pairStr.split("\\s+");
 
         /* Sanity check for old-style unsupported feature invocations. */
         if (pair.length != 2) {
           System.err.println("FATAL: Invalid feature weight line found in config file.");
           System.err
-              .println(String.format("The line was '%s'", joshuaConfiguration.weights.get(i)));
+              .println(String.format("The line was '%s'", pairStr));
           System.err
               .println("You might be using an old version of the config file that is no longer supported");
           System.err
@@ -423,41 +621,52 @@ public class Decoder {
           System.exit(17);
         }
 
-        weights.put(pair[0], Float.parseFloat(pair[1]));
+        weights.set(pair[0], Float.parseFloat(pair[1]));
       }
+
+      Decoder.LOG(1, String.format("Read %d weights (%d of them dense)", weights.size(),
+          FeatureVector.DENSE_FEATURE_NAMES.size()));
 
       // Do this before loading the grammars and the LM.
       this.featureFunctions = new ArrayList<FeatureFunction>();
 
-      // Initialize and load grammars.
+      // Initialize and load grammars. This must happen first, since the vocab gets defined by
+      // the packed grammar (if any)
       this.initializeTranslationGrammars();
-      logger.info(String.format("Grammar loading took: %d seconds.",
-          (System.currentTimeMillis() - pre_load_time) / 1000));
 
-      // Initialize the LM.
-      initializeLanguageModels();
+      Decoder.LOG(1, String.format("Grammar loading took: %d seconds.",
+          (System.currentTimeMillis() - pre_load_time) / 1000));
 
       // Initialize the features: requires that LM model has been initialized.
       this.initializeFeatureFunctions();
 
+      // This is mostly for compatibility with the Moses tuning script
+      if (joshuaConfiguration.show_weights_and_quit) {
+        for (int i = 0; i < FeatureVector.DENSE_FEATURE_NAMES.size(); i++) {
+          String name = FeatureVector.DENSE_FEATURE_NAMES.get(i);
+          if (joshuaConfiguration.moses) 
+            System.out.println(String.format("%s= %.5f", mosesize(name), weights.getDense(i)));
+          else
+            System.out.println(String.format("%s %.5f", name, weights.getDense(i)));
+        }
+        System.exit(0);
+      }
+      
       // Sort the TM grammars (needed to do cube pruning)
       if (joshuaConfiguration.amortized_sorting) {
-        logger.info("Grammar sorting happening lazily on-demand.");
+        Decoder.LOG(1, "Grammar sorting happening lazily on-demand.");
       } else {
         long pre_sort_time = System.currentTimeMillis();
-        for (GrammarFactory grammarFactory : this.grammarFactories) {
-          if (grammarFactory instanceof Grammar) {
-            Grammar batchGrammar = (Grammar) grammarFactory;
-            batchGrammar.sortGrammar(this.featureFunctions);
-          }
+        for (Grammar grammar : this.grammars) {
+          grammar.sortGrammar(this.featureFunctions);
         }
-        logger.info(String.format("Grammar sorting took %d seconds.",
+        Decoder.LOG(1, String.format("Grammar sorting took %d seconds.",
             (System.currentTimeMillis() - pre_sort_time) / 1000));
       }
 
       // Create the threads
       for (int i = 0; i < joshuaConfiguration.num_parallel_decoders; i++) {
-        this.threadPool.put(new DecoderThread(this.grammarFactories, Decoder.weights,
+        this.threadPool.put(new DecoderThread(this.grammars, Decoder.weights,
             this.featureFunctions, joshuaConfiguration));
       }
 
@@ -471,79 +680,100 @@ public class Decoder {
     return this;
   }
 
-  private void initializeLanguageModels() throws IOException {
-
-    this.languageModels = new ArrayList<NGramLanguageModel>();
-
-    // lm = kenlm 5 0 0 100 file
-    for (String lmLine : joshuaConfiguration.lms) {
-
-      logger.info("lm line: " + lmLine);
-
-      String tokens[] = lmLine.split("\\s+");
-      String lm_type = tokens[0];
-      int lm_order = Integer.parseInt(tokens[1]);
-      boolean minimizing = Boolean.parseBoolean(tokens[2]);
-      String lm_file = tokens[5];
-
-      if (lm_type.equals("kenlm")) {
-        KenLM lm = new KenLM(lm_order, lm_file, minimizing);
-        this.languageModels.add(lm);
-        Vocabulary.registerLanguageModel(lm);
-        Vocabulary.id(joshuaConfiguration.default_non_terminal);
-
-      } else if (lm_type.equals("berkeleylm")) {
-        LMGrammarBerkeley lm = new LMGrammarBerkeley(lm_order, lm_file);
-        this.languageModels.add(lm);
-        Vocabulary.registerLanguageModel(lm);
-        Vocabulary.id(joshuaConfiguration.default_non_terminal);
-
-      } else if (lm_type.equals("none")) {
-        ; // do nothing
-
-      } else {
-        logger.warning("WARNING: using built-in language model; you probably didn't intend this");
-        logger.warning("  Valid lm types are 'kenlm', 'berkeleylm', 'none'");
-      }
-    }
-
-    for (int i = 0; i < this.languageModels.size(); i++) {
-      NGramLanguageModel lm = this.languageModels.get(i);
-
-      if (lm instanceof KenLM && lm.isMinimizing()) {
-        this.featureFunctions.add(new KenLMFF(weights, String.format("lm_%d", i), (KenLM) lm));
-      } else {
-        this.featureFunctions.add(new LanguageModelFF(weights, String.format("lm_%d", i), lm));
-      }
-    }
-  }
-
+  /**
+   * Initializes translation grammars Retained for backward compatibility
+   * 
+   * @param ownersSeen Records which PhraseModelFF's have been instantiated (one is needed for each
+   *          owner)
+   * @throws IOException
+   */
   private void initializeTranslationGrammars() throws IOException {
 
     if (joshuaConfiguration.tms.size() > 0) {
 
-      // Records which PhraseModelFF's have been instantiated (one is needed for each owner).
-      HashSet<String> ownersSeen = new HashSet<String>();
+      // collect packedGrammars to check if they use a shared vocabulary
+      final List<PackedGrammar> packed_grammars = new ArrayList<>();
 
-      // tm = {thrax/hiero,packed,samt} OWNER LIMIT FILE
+      // tm = {thrax/hiero,packed,samt,moses} OWNER LIMIT FILE
       for (String tmLine : joshuaConfiguration.tms) {
-        String tokens[] = tmLine.split("\\s+");
-        String format = tokens[0];
-        String owner = tokens[1];
-        int span_limit = Integer.parseInt(tokens[2]);
-        String file = tokens[3];
 
-        GrammarFactory grammar = null;
-        if (format.equals("packed") || new File(file).isDirectory()) {
-          try {
-            grammar = new PackedGrammar(file, span_limit, owner,joshuaConfiguration);
-          } catch (FileNotFoundException e) {
-            System.err.println(String.format("Couldn't load packed grammar from '%s'", file));
-            System.err.println("Perhaps it doesn't exist, or it may be an old packed file format.");
-            System.exit(2);
+        String type = tmLine.substring(0,  tmLine.indexOf(' '));
+        String[] args = tmLine.substring(tmLine.indexOf(' ')).trim().split("\\s+");
+        HashMap<String, String> parsedArgs = FeatureFunction.parseArgs(args);
+
+        String owner = parsedArgs.get("owner");
+        int span_limit = Integer.parseInt(parsedArgs.get("maxspan"));
+        String path = parsedArgs.get("path");
+
+        Grammar grammar = null;
+        if (! type.equals("moses") && ! type.equals("phrase")) {
+          if (new File(path).isDirectory()) {
+            try {
+              PackedGrammar packed_grammar = new PackedGrammar(path, span_limit, owner, type, joshuaConfiguration);
+              packed_grammars.add(packed_grammar);
+              grammar = packed_grammar;
+            } catch (FileNotFoundException e) {
+              System.err.println(String.format("Couldn't load packed grammar from '%s'", path));
+              System.err.println("Perhaps it doesn't exist, or it may be an old packed file format.");
+              System.exit(2);
+            }
+          } else {
+            // thrax, hiero, samt
+            grammar = new MemoryBasedBatchGrammar(type, path, owner,
+                joshuaConfiguration.default_non_terminal, span_limit, joshuaConfiguration);
           }
+          
+        } else {
 
-        } else if(joshuaConfiguration.fuzzy_matching){
+          int maxSourceLen = parsedArgs.containsKey("max-source-len") 
+              ? Integer.parseInt(parsedArgs.get("max-source-len"))
+              : -1;
+
+          joshuaConfiguration.search_algorithm = "stack";
+          grammar = new PhraseTable(path, owner, type, joshuaConfiguration, maxSourceLen);
+        }
+
+        this.grammars.add(grammar);
+      }
+
+      checkSharedVocabularyChecksumsForPackedGrammars(packed_grammars);
+
+    } else {
+      Decoder.LOG(1, "* WARNING: no grammars supplied!  Supplying dummy glue grammar.");
+      MemoryBasedBatchGrammar glueGrammar = new MemoryBasedBatchGrammar("glue", joshuaConfiguration);
+      glueGrammar.setSpanLimit(-1);
+      glueGrammar.addGlueRules(featureFunctions);
+      this.grammars.add(glueGrammar);
+    }
+    
+    /* Add the grammar for custom entries */
+    this.customPhraseTable = new PhraseTable(null, "custom", "phrase", joshuaConfiguration, 0);
+    this.grammars.add(this.customPhraseTable);
+    
+    /* Create an epsilon-deleting grammar */
+    if (joshuaConfiguration.lattice_decoding) {
+      Decoder.LOG(1, "Creating an epsilon-deleting grammar");
+      MemoryBasedBatchGrammar latticeGrammar = new MemoryBasedBatchGrammar("lattice", joshuaConfiguration);
+      latticeGrammar.setSpanLimit(-1);
+      HieroFormatReader reader = new HieroFormatReader();
+
+      String goalNT = FormatUtils.cleanNonTerminal(joshuaConfiguration.goal_symbol);
+      String defaultNT = FormatUtils.cleanNonTerminal(joshuaConfiguration.default_non_terminal);
+
+      String ruleString = String.format("[%s] ||| [%s,1] <eps> ||| [%s,1] ||| ", goalNT, goalNT, defaultNT,
+          goalNT, defaultNT);
+
+      Rule rule = reader.parseLine(ruleString);
+      latticeGrammar.addRule(rule);
+      rule.estimateRuleCost(featureFunctions);
+
+      this.grammars.add(latticeGrammar);
+    }
+
+//<<<<<<< HEAD
+/*
+ //TODO Fixme    
+         else if(joshuaConfiguration.fuzzy_matching){
           // Create a MemoryBasedBatchGrammar with efficient nonterminal lookup. This 
           // is important to make the fuzzy_matching decoding go fast
           grammar = new MemoryBasedBatchGrammarEfficientNonterminalLookup(format, file, owner,
@@ -554,33 +784,43 @@ public class Decoder {
               joshuaConfiguration.default_non_terminal, span_limit,joshuaConfiguration);
         }
         this.grammarFactories.add(grammar);
+*/        
+//=======
+    /* Now create a feature function for each owner */
+    HashSet<String> ownersSeen = new HashSet<String>();
 
-        // Record the owner so we can create a feature function for her.
+
+    for (Grammar grammar: this.grammars) {
+      String owner = Vocabulary.word(grammar.getOwner());
+      if (! ownersSeen.contains(owner)) {
+        this.featureFunctions.add(new PhraseModel(weights, new String[] { "tm", "-owner", owner },
+            joshuaConfiguration, grammar));
         ownersSeen.add(owner);
       }
-
-      /*
-       * Create and add a feature function for this owner, the first time we see each owner.
-       * 
-       * Warning! This needs to be done *after* initializing the grammars, in case there is a packed
-       * grammar, since it resets the vocabulary.
-       */
-      for (String owner : ownersSeen) {
-        this.featureFunctions.add(new PhraseModelFF(weights, owner));
-      }
-
-    } else {
-      logger.warning("* WARNING: no grammars supplied!  Supplying dummy glue grammar.");
-      // TODO: this should initialize the grammar dynamically so that the goal symbol and default
-      // non terminal match
-      MemoryBasedBatchGrammar glueGrammar = new MemoryBasedBatchGrammar("thrax", String.format(
-          "%s/data/glue-grammar", System.getenv().get("JOSHUA")), "glue",
-          joshuaConfiguration.default_non_terminal, -1, joshuaConfiguration);
-      this.grammarFactories.add(glueGrammar);
     }
-
-    logger.info(String.format("Memory used %.1f MB", ((Runtime.getRuntime().totalMemory() - Runtime
-        .getRuntime().freeMemory()) / 1000000.0)));
+      
+    Decoder.LOG(1, String.format("Memory used %.1f MB",
+        ((Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / 1000000.0)));
+  }
+  
+  /**
+   * Checks if multiple packedGrammars have the same vocabulary by comparing their vocabulary file checksums.
+   */
+  private static void checkSharedVocabularyChecksumsForPackedGrammars(final List<PackedGrammar> packed_grammars) {
+    String previous_checksum = "";
+    for (PackedGrammar grammar : packed_grammars) {
+      final String checksum = grammar.computeVocabularyChecksum();
+      if (previous_checksum.isEmpty()) {
+        previous_checksum = checksum;
+      } else {
+        if (!checksum.equals(previous_checksum)) {
+          throw new RuntimeException(
+              "Trying to load multiple packed grammars with different vocabularies!" +
+              "Have you packed them jointly?");
+        }
+        previous_checksum = checksum;
+      }
+    }
   }
 
   /*
@@ -589,11 +829,11 @@ public class Decoder {
    * 
    * FEATURE_NAME WEIGHT
    */
-  private FeatureVector readWeights(String fileName) {
-    FeatureVector weights = new FeatureVector();
+  private void readWeights(String fileName) {
+    Decoder.weights = new FeatureVector();
 
     if (fileName.equals(""))
-      return new FeatureVector();
+      return;
 
     try {
       LineReader lineReader = new LineReader(fileName);
@@ -608,8 +848,13 @@ public class Decoder {
         String tokens[] = line.split("\\s+");
         String feature = tokens[0];
         Float value = Float.parseFloat(tokens[1]);
+        
+        // Kludge for compatibility with Moses tuners
+        if (joshuaConfiguration.moses) {
+          feature = demoses(feature);
+        }
 
-        weights.put(feature, value);
+        weights.increment(feature, value);
       }
     } catch (FileNotFoundException ioe) {
       System.err.println("* FATAL: Can't find weights-file '" + fileName + "'");
@@ -619,10 +864,18 @@ public class Decoder {
       ioe.printStackTrace();
       System.exit(1);
     }
+    
+    Decoder.LOG(1, String.format("Read %d weights from file '%s'", weights.size(), fileName));
+  }
 
-    logger.info(String.format("Read %d weights from file '%s'", weights.size(), fileName));
-
-    return weights;
+  private String demoses(String feature) {
+    if (feature.endsWith("="))
+      feature = feature.replace("=", "");
+    if (feature.equals("OOV_Penalty"))
+      feature = "OOVPenalty";
+    else if (feature.startsWith("tm-") || feature.startsWith("lm-"))
+      feature = feature.replace("-",  "_");
+    return feature;
   }
   
   public static boolean stringsEqualIgnoreCase(String string1, String string2){
@@ -639,76 +892,83 @@ public class Decoder {
    * 
    * Weights for features are listed separately.
    * 
+   * @param tmOwnersSeen
+   * @throws IOException
+   * 
    */
-  private void initializeFeatureFunctions() {
+  private void initializeFeatureFunctions() throws IOException {
 
     for (String featureLine : joshuaConfiguration.features) {
+      // feature-function = NAME args
+      // 1. create new class named NAME, pass it config, weights, and the args
 
       // Get rid of the leading crap.
       featureLine = featureLine.replaceFirst("^feature_function\\s*=\\s*", "");
 
       String fields[] = featureLine.split("\\s+");
-      String feature = fields[0].toLowerCase();
-
-      if (feature.equals("latticecost") || feature.equals("sourcepath")) {
-        this.featureFunctions.add(new SourcePathFF(Decoder.weights));
+      String featureName = fields[0];
+      try {
+        Class<?> clas = getClass(featureName);
+        Constructor<?> constructor = clas.getConstructor(FeatureVector.class,
+            String[].class, JoshuaConfiguration.class);
+        this.featureFunctions.add((FeatureFunction) constructor.newInstance(weights, fields, joshuaConfiguration));
+      } catch (Exception e) {
+        e.printStackTrace();
+        System.err.println("* FATAL: could not find a feature '" + featureName + "'");
+        System.exit(1);
       }
+    }
 
-      else if (feature.equals("arityphrasepenalty") || feature.equals("aritypenalty")) {
-        String owner = fields[1];
-        int startArity = Integer.parseInt(fields[2].trim());
-        int endArity = Integer.parseInt(fields[3].trim());
+    for (FeatureFunction feature : featureFunctions) {
+      Decoder.LOG(1, String.format("FEATURE: %s", feature.logString()));
+      
+    }
 
-        this.featureFunctions.add(new ArityPhrasePenaltyFF(weights, String.format("%s %d %d",
-            owner, startArity, endArity)));
-      }
+    weights.registerDenseFeatures(featureFunctions);
+  }
 
-      else if (feature.equals("wordpenalty")) {
-        this.featureFunctions.add(new WordPenaltyFF(weights));
-      }
-
-      else if (feature.equals("oovpenalty")) {
-        this.featureFunctions.add(new OOVFF(weights));
-
-      } else if (feature.equals("edgephrasesimilarity")) {
-        String host = fields[1].trim();
-        int port = Integer.parseInt(fields[2].trim());
-
+  /**
+   * Searches a list of predefined paths for classes, and returns the first one found. Meant for
+   * instantiating feature functions.
+   * 
+   * @param name
+   * @return the class, found in one of the search paths
+   * @throws ClassNotFoundException
+   */
+  private Class<?> getClass(String featureName) {
+    Class<?> clas = null;
+    String[] packages = { "joshua.decoder.ff", "joshua.decoder.ff.lm", "joshua.decoder.ff.phrase" };
+    for (String path : packages) {
+      try {
+        clas = Class.forName(String.format("%s.%s", path, featureName));
+        break;
+      } catch (ClassNotFoundException e) {
         try {
-          this.featureFunctions.add(new EdgePhraseSimilarityFF(weights, host, port));
-
-        } catch (Exception e) {
-          e.printStackTrace();
-          System.exit(1);
+          clas = Class.forName(String.format("%s.%sFF", path, featureName));
+          break;
+        } catch (ClassNotFoundException e2) {
+          // do nothing
         }
 
-      } else if (feature.equals("phrasemodel") || feature.equals("tm")) {
-        String owner = fields[1].trim();
-        String index = fields[2].trim();
-        Float weight = Float.parseFloat(fields[3]);
-
-        weights.put(String.format("tm_%s_%s", owner, index), weight);
-      }
-
       
-      //else if (feature.equals(LabelCombinationFF.getLowerCasedFeatureName())) {
-      //  this.featureFunctions.add(new LabelCombinationFF(weights));
-      //}
+ //     else if(LabelSubstitutionFFAndFFPredictionCreater.isRelevantFeatureName(feature)){
+  //      this.featureFunctions.add(LabelSubstitutionFFAndFFPredictionCreater.createLabelSubstitutionFFForFeatureName(feature, weights, joshuaConfiguration));
+  //      logger.info("Creating feature score predictor");
+  //      joshuaConfiguration.featureScorePredictor = LabelSubstitutionFFAndFFPredictionCreater.createLightWeightLabelSubstitutionFeatureScorePredictorForFeatureName(feature, weights, joshuaConfiguration);
+   //     logger.info("Created feature score predictor" + joshuaConfiguration.featureScorePredictor);
       
-      else if(LabelSubstitutionFFAndFFPredictionCreater.isRelevantFeatureName(feature)){
-        this.featureFunctions.add(LabelSubstitutionFFAndFFPredictionCreater.createLabelSubstitutionFFForFeatureName(feature, weights, joshuaConfiguration));
-        logger.info("Creating feature score predictor");
-        joshuaConfiguration.featureScorePredictor = LabelSubstitutionFFAndFFPredictionCreater.createLightWeightLabelSubstitutionFeatureScorePredictorForFeatureName(feature, weights, joshuaConfiguration);
-        logger.info("Created feature score predictor" + joshuaConfiguration.featureScorePredictor);
-      }
       
-      else {
-        System.err.println("* WARNING: invalid feature '" + featureLine + "'");
       }
     }
+    return clas;
+  }
 
-    for (FeatureFunction feature: featureFunctions) {
-      logger.info(String.format("FEATURE: %s", feature.logString()));
-    }
+  public static boolean VERBOSE(int i) {
+    return i <= VERBOSE;
+  }
+
+  public static void LOG(int i, String msg) {
+    if (VERBOSE(i))
+      System.err.println(msg);
   }
 }

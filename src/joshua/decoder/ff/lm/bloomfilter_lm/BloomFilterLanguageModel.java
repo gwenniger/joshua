@@ -1,7 +1,6 @@
 package joshua.decoder.ff.lm.bloomfilter_lm;
 
 import java.io.Externalizable;
-import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -12,7 +11,6 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
 import java.util.HashMap;
-import java.util.Scanner;
 import java.util.logging.Logger;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -20,6 +18,7 @@ import java.util.zip.GZIPOutputStream;
 import joshua.corpus.Vocabulary;
 import joshua.decoder.ff.lm.DefaultNGramLanguageModel;
 import joshua.util.Regex;
+import joshua.util.io.LineReader;
 
 /**
  * An n-gram language model with linearly-interpolated Witten-Bell smoothing, using a Bloom filter
@@ -336,24 +335,7 @@ public class BloomFilterLanguageModel extends DefaultNGramLanguageModel implemen
       System.err.println(e.getMessage());
     }
   }
-
-  private int numLines(String filename) {
-    try {
-      Scanner s = new Scanner(new File(filename));
-      int ret = 0;
-      while (s.hasNextLine()) {
-        ret++;
-        // String trash =
-        s.nextLine();
-      }
-      s.close();
-      return ret;
-    } catch (FileNotFoundException e) {
-      // BUG: don't swallow errors
-    }
-    return 0;
-  }
-
+  
   /**
    * Adds ngram counts and counts of distinct types after ngrams, read from a file, to the Bloom
    * filter.
@@ -411,11 +393,9 @@ public class BloomFilterLanguageModel extends DefaultNGramLanguageModel implemen
    * @return an estimate of the number of objects to be stored in the Bloom filter
    */
   private int estimateNumberOfObjects(InputStream source) {
-    Scanner scanner = new Scanner(source);
     int numLines = 0;
     long maxCount = 0;
-    while (scanner.hasNextLine()) {
-      String line = scanner.nextLine();
+    for (String line: new LineReader(source)) {
       if (line.trim().equals("")) continue;
       String[] toks = Regex.spaces.split(line);
       if (toks.length > ngramOrder + 1) continue;
@@ -442,10 +422,9 @@ public class BloomFilterLanguageModel extends DefaultNGramLanguageModel implemen
    *        follow each ngram
    */
   private void populateFromInputStream(InputStream source, HashMap<String, Long> types) {
-    Scanner scanner = new Scanner(source);
     numTokens = Double.NEGATIVE_INFINITY; // = log(0)
-    while (scanner.hasNextLine()) {
-      String[] toks = Regex.spaces.split(scanner.nextLine());
+    for (String line: new LineReader(source)) {
+      String[] toks = Regex.spaces.split(line);
       if ((toks.length < 2) || (toks.length > ngramOrder + 1)) continue;
       int[] ngram = new int[toks.length - 1];
       StringBuilder history = new StringBuilder();
@@ -561,10 +540,5 @@ public class BloomFilterLanguageModel extends DefaultNGramLanguageModel implemen
       lm_ngram[i] = Vocabulary.id(Vocabulary.word(ngram[i]));
     }
     return wittenBell(lm_ngram, order);
-  }
-  
-  @Override
-  public boolean isMinimizing() {
-    return false;
   }
 }

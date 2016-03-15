@@ -6,7 +6,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.logging.Logger;
-
 import joshua.corpus.Vocabulary;
 import joshua.decoder.JoshuaConfiguration;
 import joshua.decoder.chart_parser.DotChart.DotNode;
@@ -17,6 +16,7 @@ import joshua.decoder.chart_parser.DotNodeTypeCreater.DotNodeMultiLabelCreater;
 import joshua.decoder.ff.tm.Grammar;
 import joshua.decoder.ff.tm.Trie;
 import joshua.lattice.Lattice;
+import joshua.decoder.segment_file.Token;
 
 /**
  * This abstract class and its implementations serve to refine the behavior of DotChart using
@@ -76,7 +76,7 @@ public abstract class NonterminalMatcher <T extends DotNodeBase> {
 
   @SuppressWarnings("unchecked")
   public static DotChart<?,?> createDotChart(Logger logger,
-      JoshuaConfiguration joshuaConfiguration, Lattice<Integer> inputLattice,
+      JoshuaConfiguration joshuaConfiguration, Lattice<Token> inputLattice,
       Grammar grammar,Chart theChart,NonterminalMatcher<?> nonterminalMatcher
       ) {
     List<Integer> allNonterminalIndicesExceptForGoalAndOOV = getAllNonterminalIndicesExceptForGoalAndOOV(joshuaConfiguration);

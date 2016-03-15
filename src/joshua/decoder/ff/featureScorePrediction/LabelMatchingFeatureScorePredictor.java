@@ -3,7 +3,6 @@ package joshua.decoder.ff.featureScorePrediction;
 import joshua.decoder.ff.FeatureVector;
 import joshua.decoder.ff.LabelSubstitutionFF;
 import joshua.decoder.ff.featureScorePrediction.BasicLabelSubstitutionFeatureScorePredictor.SubstitutionPair;
-import org.junit.Assert;
 
 public class LabelMatchingFeatureScorePredictor  {
   private final float matchScore;
@@ -35,8 +34,8 @@ public class LabelMatchingFeatureScorePredictor  {
   private static float getMatchScore(String featureTypePrefix, FeatureVector featureVector) {
     // It is possible that the match feature has no weight yet, and this is even certain 
     // to be the case at the first tuning iteration
-    if(featureVector.containsKey(getMatchFeatureString(featureTypePrefix))){
-      return featureVector.get(getMatchFeatureString(featureTypePrefix));  
+    if(featureVector.hasValue(getMatchFeatureString(featureTypePrefix))){
+      return featureVector.getWeight(getMatchFeatureString(featureTypePrefix));  
     }
     return 0;
     
@@ -45,8 +44,8 @@ public class LabelMatchingFeatureScorePredictor  {
   private static float getNoMatchScore(String featureTypePrefix, FeatureVector featureVector) {
     // It is possible that the match feature has no weight yet, and this is even certain 
     // to be the case at the first tuning iteration
-    if(featureVector.containsKey(getNoMatchFeatureString(featureTypePrefix))){
-      return featureVector.get(getNoMatchFeatureString(featureTypePrefix));  
+    if(featureVector.hasValue(getNoMatchFeatureString(featureTypePrefix))){
+      return featureVector.getWeight(getNoMatchFeatureString(featureTypePrefix));  
     }
     return 0;
   }

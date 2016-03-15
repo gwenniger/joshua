@@ -1,10 +1,8 @@
 package joshua.decoder.ff.tm.format;
 
-import java.util.logging.Logger;
-
 import joshua.corpus.Vocabulary;
-import joshua.decoder.ff.tm.BilingualRule;
 import joshua.decoder.ff.tm.GrammarReader;
+import joshua.decoder.ff.tm.Rule;
 
 /**
  * This class implements reading files in the format defined by David Chiang for Hiero. 
@@ -13,12 +11,10 @@ import joshua.decoder.ff.tm.GrammarReader;
  * @author Matt Post <post@cs.jhu.edu>
  */
 
-public class HieroFormatReader extends GrammarReader<BilingualRule> {
-
-  private static final Logger logger = Logger.getLogger(HieroFormatReader.class.getName());
+public class HieroFormatReader extends GrammarReader<Rule> {
 
   static {
-    fieldDelimiter = "\\s+\\|{3}\\s+";
+    fieldDelimiter = "\\s\\|{3}\\s";
     nonTerminalRegEx = "^\\[[^\\s]+\\,[0-9]*\\]$";
     nonTerminalCleanRegEx = ",[0-9\\s]+";
     // nonTerminalRegEx = "^\\[[A-Z]+\\,[0-9]*\\]$";
@@ -35,10 +31,10 @@ public class HieroFormatReader extends GrammarReader<BilingualRule> {
   }
 
   @Override
-  protected BilingualRule parseLine(String line) {
+  public Rule parseLine(String line) {
     String[] fields = line.split(fieldDelimiter);
-    if (fields.length != 4) {
-      logger.severe("Rule line does not have four fields: " + line);
+    if (fields.length < 3) {
+      throw new RuntimeException(String.format("Rule '%s' does not have four fields", line));
     }
 
     int lhs = Vocabulary.id(cleanNonTerminal(fields[0]));
@@ -55,7 +51,7 @@ public class HieroFormatReader extends GrammarReader<BilingualRule> {
       }
     }
 
-    // english side
+    // English side
     String[] englishWords = fields[2].split("\\s+");
     int[] english = new int[englishWords.length];
     for (int i = 0; i < englishWords.length; i++) {
@@ -65,13 +61,14 @@ public class HieroFormatReader extends GrammarReader<BilingualRule> {
       }
     }
 
-    String sparse_features = fields[3];
+    String sparse_features = (fields.length > 3 ? fields[3] : "");
+    String alignment = (fields.length > 4) ? fields[4] : null;
 
-    return new BilingualRule(lhs, french, english, sparse_features, arity);
+    return new Rule(lhs, french, english, sparse_features, arity, alignment);
   }
 
   @Override
-  public String toWords(BilingualRule rule) {
+  public String toWords(Rule rule) {
     StringBuffer sb = new StringBuffer("");
     sb.append(Vocabulary.word(rule.getLHS()));
     sb.append(" ||| ");
@@ -79,13 +76,13 @@ public class HieroFormatReader extends GrammarReader<BilingualRule> {
     sb.append(" ||| ");
     sb.append(Vocabulary.getWords(rule.getEnglish()));
     sb.append(" |||");
-    sb.append(" " + rule.computeFeatures());
+    sb.append(" " + rule.getFeatureVector());
 
     return sb.toString();
   }
 
   @Override
-  public String toWordsWithoutFeatureScores(BilingualRule rule) {
+  public String toWordsWithoutFeatureScores(Rule rule) {
     StringBuffer sb = new StringBuffer();
     sb.append(rule.getLHS());
     sb.append(" ||| ");

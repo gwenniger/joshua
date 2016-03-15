@@ -1,11 +1,21 @@
 package joshua.decoder;
 
+import java.io.BufferedReader;
 import java.io.FileInputStream;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.PrintStream;
+import java.net.InetSocketAddress;
 import java.util.logging.Logger;
 
-import joshua.decoder.io.TranslationRequest;
+import com.sun.net.httpserver.HttpServer;
+
+import joshua.decoder.JoshuaConfiguration.SERVER_TYPE;
+import joshua.decoder.io.TranslationRequestStream;
 import joshua.server.TcpServer;
+import joshua.server.ServerThread;
 
 /**
  * Implements decoder initialization, including interaction with <code>JoshuaConfiguration</code>
@@ -42,36 +52,55 @@ public class JoshuaDecoder {
     /* Step-1: initialize the decoder, test-set independent */
     Decoder decoder = new Decoder(joshuaConfiguration, userArgs.getConfigFile());
 
-    logger.info(String.format("Model loading took %d seconds",
-      (System.currentTimeMillis() - startTime) / 1000));
-    logger.info(String.format("Memory used %.1f MB", ((Runtime.getRuntime().totalMemory() - Runtime
+    Decoder.LOG(1, String.format("Model loading took %d seconds",
+        (System.currentTimeMillis() - startTime) / 1000));
+    Decoder.LOG(1, String.format("Memory used %.1f MB", ((Runtime.getRuntime().totalMemory() - Runtime
         .getRuntime().freeMemory()) / 1000000.0)));  
 
     /* Step-2: Decoding */
     // create a server if requested, which will create TranslationRequest objects
     if (joshuaConfiguration.server_port > 0) {
-      new TcpServer(decoder, joshuaConfiguration.server_port,joshuaConfiguration).start();
+      int port = joshuaConfiguration.server_port;
+      if (joshuaConfiguration.server_type == SERVER_TYPE.TCP) {
+        new TcpServer(decoder, port, joshuaConfiguration).start();
+
+      } else if (joshuaConfiguration.server_type == SERVER_TYPE.HTTP) {
+        HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
+        Decoder.LOG(1, String.format("** HTTP Server running and listening on port %d.", port));  
+        server.createContext("/", new ServerThread(null, decoder, joshuaConfiguration));
+        server.setExecutor(null); // creates a default executor
+        server.start();
+      } else {
+        System.err.println("* FATAL: unknown server type");
+        System.exit(1);
+      }
       return;
     }
     
-    // create a TranslationRequest object on STDIN
-    TranslationRequest fileRequest = new TranslationRequest(System.in, joshuaConfiguration);
-    Translations translationStream = decoder.decodeAll(fileRequest);
-    for (;;) {
-      Translation translation = translationStream.next();
-      if (translation == null)
-        break;
-      
-      System.out.print(translation);
-    }
+    // Create the n-best output stream
+    FileWriter out = null;
+    if (joshuaConfiguration.n_best_file != null)
+      out = new FileWriter(joshuaConfiguration.n_best_file);
+    
+    // Create a TranslationRequest object, reading from a file if requested, or from STDIN
+    InputStream input = (joshuaConfiguration.input_file != null) 
+      ? new FileInputStream(joshuaConfiguration.input_file)
+      : System.in;
 
-    logger.info("Decoding completed.");
-    logger.info(String.format("Memory used %.1f MB", ((Runtime.getRuntime().totalMemory() - Runtime
+    BufferedReader reader = new BufferedReader(new InputStreamReader(input));
+    TranslationRequestStream fileRequest = new TranslationRequestStream(reader, joshuaConfiguration);
+    decoder.decodeAll(fileRequest, new PrintStream(System.out));
+    
+    if (joshuaConfiguration.n_best_file != null)
+      out.close();
+
+    Decoder.LOG(1, "Decoding completed.");
+    Decoder.LOG(1, String.format("Memory used %.1f MB", ((Runtime.getRuntime().totalMemory() - Runtime
         .getRuntime().freeMemory()) / 1000000.0)));
 
     /* Step-3: clean up */
     decoder.cleanUp();
-    logger.info(String.format("Total running time: %d seconds",
+    Decoder.LOG(1, String.format("Total running time: %d seconds",
       (System.currentTimeMillis() - startTime) / 1000));
   }
 }

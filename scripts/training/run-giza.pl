@@ -11,8 +11,8 @@ my $JOSHUA = $ENV{JOSHUA};
 
 my $ZCAT = "gzip -cd";
 my $BZCAT = "bzcat";
-my $SYMAL = "$JOSHUA/scripts/training/symal/symal";
-my $GIZA2BAL = "$JOSHUA/scripts/training/symal/giza2bal.pl";
+my $SYMAL = "$JOSHUA/ext/symal/symal";
+my $GIZA2BAL = "$JOSHUA/ext/symal/giza2bal.pl";
 
 my ($_F,$_E,$_ROOT_DIR,$_CORPUS,$_PARALLEL);
 my ($_HMM_ALIGN,$_FINAL_ALIGNMENT_MODEL,$_GIZA_EXTENSION,$_DICTIONARY,$_MGIZA,$_MGIZA_CPUS,$_GIZA_E2F,$_GIZA_F2E,$_GIZA_OPTION,$_ONLY_PRINT_GIZA,$_ALIGNMENT);
@@ -229,17 +229,17 @@ sub word_align {
   my($__ALIGNMENT_CMD,$__ALIGNMENT_INV_CMD);
   
   if (-e "$___GIZA_F2E/$___F-$___E.$___GIZA_EXTENSION.bz2"){
-	$__ALIGNMENT_CMD="\"$BZCAT $___GIZA_F2E/$___F-$___E.$___GIZA_EXTENSION.bz2\"";
+	$__ALIGNMENT_CMD="<($BZCAT $___GIZA_F2E/$___F-$___E.$___GIZA_EXTENSION.bz2)";
   } elsif (-e "$___GIZA_F2E/$___F-$___E.$___GIZA_EXTENSION.gz") {
-	$__ALIGNMENT_CMD="\"$ZCAT $___GIZA_F2E/$___F-$___E.$___GIZA_EXTENSION.gz\"";
+	$__ALIGNMENT_CMD="<($ZCAT $___GIZA_F2E/$___F-$___E.$___GIZA_EXTENSION.gz)";
   } else {
 	die "ERROR: Can't read $___GIZA_F2E/$___F-$___E.$___GIZA_EXTENSION.{bz2,gz}\n";
   }
   
   if ( -e "$___GIZA_E2F/$___E-$___F.$___GIZA_EXTENSION.bz2"){
-	$__ALIGNMENT_INV_CMD="\"$BZCAT $___GIZA_E2F/$___E-$___F.$___GIZA_EXTENSION.bz2\"";
+	$__ALIGNMENT_INV_CMD="<($BZCAT $___GIZA_E2F/$___E-$___F.$___GIZA_EXTENSION.bz2)";
   }elsif (-e "$___GIZA_E2F/$___E-$___F.$___GIZA_EXTENSION.gz"){
-	$__ALIGNMENT_INV_CMD="\"$ZCAT $___GIZA_E2F/$___E-$___F.$___GIZA_EXTENSION.gz\"";
+	$__ALIGNMENT_INV_CMD="<($ZCAT $___GIZA_E2F/$___E-$___F.$___GIZA_EXTENSION.gz)";
   }else{
 	die "ERROR: Can't read $___GIZA_E2F/$___E-$___F.$___GIZA_EXTENSION.{bz2,gz}\n\n";
   }
@@ -264,8 +264,8 @@ sub word_align {
   
   safesystem("$GIZA2BAL -d $__ALIGNMENT_INV_CMD -i $__ALIGNMENT_CMD |".
 			 "$SYMAL -alignment=\"$__symal_a\" -diagonal=\"$__symal_d\" ".
-			 "-final=\"$__symal_f\" -both=\"$__symal_b\" > ".
-			 "$___ALIGNMENT_FILE.$___ALIGNMENT") 
+			 "-final=\"$__symal_f\" -both=\"$__symal_b\"".
+			 " -o=$___ALIGNMENT_FILE.$___ALIGNMENT") 
       ||
 	  die "ERROR: Can't generate symmetrized alignment file\n"
 	  
@@ -416,6 +416,8 @@ sub run_single_snt2cooc {
 }
 
 sub safesystem {
+  unshift (@_, '-c');
+  unshift (@_, 'bash');
   print STDERR "Executing: @_\n";
   system(@_);
   if ($? == -1) {

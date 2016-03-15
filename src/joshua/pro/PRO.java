@@ -1,19 +1,3 @@
-/*
- * This file is part of the Joshua Machine Translation System.
- * 
- * Joshua is free software; you can redistribute it and/or modify it under the terms of the GNU
- * Lesser General Public License as published by the Free Software Foundation; either version 2.1 of
- * the License, or (at your option) any later version.
- * 
- * This library is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
- * even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * Lesser General Public License for more details.
- * 
- * You should have received a copy of the GNU Lesser General Public License along with this library;
- * if not, write to the Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
- * 02111-1307 USA
- */
-
 package joshua.pro;
 
 import joshua.decoder.JoshuaConfiguration;
@@ -130,7 +114,6 @@ public class PRO {
       println("  -thrCnt threadCount: number of threads to run in parallel when optimizing\n    [[default: 1]]");
       println("  -save saveInter: save intermediate cfg files (1) or decoder outputs (2)\n    or both (3) or neither (0)\n    [[default: 3]]");
       println("  -compress compressFiles: should PRO compress the files it produces (1)\n    or not (0)\n    [[default: 0]]");
-      println("  -ipi initsPerIt: number of intermediate initial points per iteration\n    [[default: 20]]");
       println("  -opi oncePerIt: modify a parameter only once per iteration (1) or not (0)\n    [[default: 0]]");
       println("  -rand randInit: choose initial point randomly (1) or from paramsFile (0)\n    [[default: 0]]");
       println("  -seed seed: seed used to initialize random number generator\n    [[default: time (i.e. value returned by System.currentTimeMillis()]]");

@@ -3,17 +3,23 @@ package joshua.decoder.hypergraph;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.PriorityQueue;
+import java.util.Stack;
+import java.util.regex.Matcher;
+
 import joshua.corpus.Vocabulary;
 import joshua.decoder.BLEU;
 import joshua.decoder.JoshuaConfiguration;
 import joshua.decoder.chart_parser.ComputeNodeResult;
 import joshua.decoder.ff.FeatureFunction;
 import joshua.decoder.ff.FeatureVector;
+import joshua.decoder.ff.fragmentlm.Tree;
 import joshua.decoder.ff.state_maintenance.DPState;
 import joshua.decoder.ff.tm.Rule;
 import joshua.decoder.io.DeNormalize;
@@ -52,18 +58,14 @@ import joshua.decoder.segment_file.Sentence;
  * 
  * and so on.
  * 
- * Technical notes (from before):
+ * The configuration parameter `output-format` controls what exactly is extracted from the forest.
+ * See documentation for that below. Note that Joshua does not store individual feature values while 
+ * decoding, but only the cost of each edge (in the form of a float). Therefore, if you request
+ * the features values (`%f` in `output-format`), the feature functions must be replayed, which
+ * is expensive.
  * 
- * To seed the kbest extraction, it only needs that each hyperedge should have the best_cost
- * properly set, and it does not require any list being sorted. Instead, the priority queue
- * heap_cands will do internal sorting. In fact, the real crucial cost is the transition-cost at
- * each hyperedge. We store the best-cost instead of the transition cost since it is easy to do
- * pruning and find one-best. Moreover, the transition cost can be recovered by
- * get_transition_cost(), though somewhat expensive.
- * 
- * To recover the model cost for each individual model, we should either have access to the model,
- * or store the model cost in the hyperedge. (For example, in the case of disk-hypergraph, we need
- * to store all these model cost at each hyperedge.)
+ * The configuration parameter `top-n` controls how many items are returned. If this is set to 0,
+ * k-best extraction should be turned off entirely.
  * 
  * @author Zhifei Li, <zhifei.work@gmail.com>
  * @author Matt Post <post@cs.jhu.edu>
@@ -84,6 +86,7 @@ public class KBestExtractor {
   private boolean extractUniqueNbest = true;
 
   /* Whether to include the alignment information in the output */
+  @SuppressWarnings("unused")
   private boolean includeAlign = false;
 
   /* Which side to output (source or target) */
@@ -120,48 +123,70 @@ public class KBestExtractor {
   }
 
   /**
-   * k starts from 1.
+   * Returns the kth derivation.
+   * 
+   * You may need to reset_state() before you call this function for the first time.
+   * 
+   * @param node the node to start at
+   * @param k the kth best derivation (indexed from 1)
+   * @return the derivation object
+   */
+  public DerivationState getKthDerivation(HGNode node, int k) {
+    VirtualNode virtualNode = getVirtualNode(node);
+    return virtualNode.lazyKBestExtractOnNode(this, k);
+  }
+  
+  /**
+   * Compute the string that is output from the decoder, using the "output-format" config file
+   * parameter as a template.
    * 
    * You may need to reset_state() before you call this function for the first time.
    */
   public String getKthHyp(HGNode node, int k) {
 
-    VirtualNode virtualNode = getVirtualNode(node);
-
     String outputString = null;
 
     // Determine the k-best hypotheses at each HGNode
+    VirtualNode virtualNode = getVirtualNode(node);
     DerivationState derivationState = virtualNode.lazyKBestExtractOnNode(this, k);
+//    DerivationState derivationState = getKthDerivation(node, k);
     if (derivationState != null) {
       // ==== read the kbest from each hgnode and convert to output format
       FeatureVector features = new FeatureVector();
 
-      /* Don't extract the features (expensive) if they're not requested */
+      /*
+       * To save space, the decoder only stores the model cost, no the individual feature values. If
+       * you want to output them, you have to replay them.
+       */
       String hypothesis = null;
       if (joshuaConfiguration.outputFormat.contains("%f")
           || joshuaConfiguration.outputFormat.contains("%d"))
-        hypothesis = derivationState.getHypothesis(false, features, models, Side.TARGET);
-      else
-        hypothesis = derivationState.getHypothesis(false, null, models, Side.TARGET);
+        features = derivationState.replayFeatures();
 
-      outputString = joshuaConfiguration.outputFormat.replace("%s", hypothesis)
+      hypothesis = derivationState.getHypothesis()
+          .replaceAll("-lsb-", "[")
+          .replaceAll("-rsb-", "]")
+          .replaceAll("-pipe-", "|");
+
+
+      outputString = joshuaConfiguration.outputFormat
+          .replace("%k", Integer.toString(k))
+          .replace("%s", hypothesis)
           .replace("%S", DeNormalize.processSingleLine(hypothesis))
-          .replace("%i", Integer.toString(sentence.id())).replace("%f", features.toString())
-          .replace("%c", String.format("%.3f", -derivationState.getModelCost()));
+          .replace("%i", Integer.toString(sentence.id()))
+          .replace("%f", joshuaConfiguration.moses ? features.mosesString() : features.toString())
+          .replace("%c", String.format("%.3f", derivationState.cost));
 
       if (joshuaConfiguration.outputFormat.contains("%t")) {
-        outputString = outputString.replace("%t",
-            derivationState.getHypothesis(true, null, models, Side.TARGET));
+        outputString = outputString.replace("%t", derivationState.getTree());
       }
 
       if (joshuaConfiguration.outputFormat.contains("%e"))
-        outputString = outputString.replace("%e",
-            derivationState.getHypothesis(false, null, models, Side.SOURCE));
+        outputString = outputString.replace("%e", derivationState.getHypothesis(Side.SOURCE));
 
       /* %d causes a derivation with rules one per line to be output */
       if (joshuaConfiguration.outputFormat.contains("%d")) {
-        outputString = outputString.replace("%d",
-            derivationState.getDerivation(new FeatureVector(), models, 0));
+        outputString = outputString.replace("%d", derivationState.getDerivation());
       }
     }
 
@@ -174,17 +199,22 @@ public class KBestExtractor {
    * Convenience function for k-best extraction that prints to STDOUT.
    */
   public void lazyKBestExtractOnHG(HyperGraph hg, int topN) throws IOException {
-
     lazyKBestExtractOnHG(hg, topN, new BufferedWriter(new OutputStreamWriter(System.out)));
   }
 
   /**
-   * This is the entry point for extracting k-best hypotheses.
+   * This is the entry point for extracting k-best hypotheses. It computes all of them, writing
+   * the results to the BufferedWriter passed in. If you want intermediate access to the k-best
+   * derivations, you'll want to call getKthHyp() or getKthDerivation() directly.
+   * 
+   * The number of derivations that are looked for is controlled by the `top-n` parameter.
+   * Note that when `top-n` is set to 0, k-best extraction is disabled entirely, and only things 
+   * like the viterbi string and the model score are available to the decoder. Since k-best
+   * extraction involves the recomputation of features to get the component values, turning off
+   * that extraction saves a lot of time when only the 1-best string is desired.
    * 
    * @param hg the hypergraph to extract from
-   * @param featureFunctions the feature functions to use
    * @param topN how many to extract
-   * @param sentence the input sentence
    * @param out object to write to
    * @throws IOException
    */
@@ -195,10 +225,9 @@ public class KBestExtractor {
     if (null == hg.goalNode)
       return;
 
-    for (int k = 1;; k++) {
+    for (int k = 1; k <= topN; k++) {
       String hypStr = getKthHyp(hg.goalNode, k);
-
-      if (null == hypStr || k > topN)
+      if (null == hypStr)
         break;
 
       out.write(hypStr);
@@ -231,14 +260,13 @@ public class KBestExtractor {
     return virtualNode;
   }
 
-  // =========================== class VirtualNode ===========================
+
   /**
    * This class is essentially a wrapper around an HGNode, annotating it with information needed to
-   * record which hypotheses have been explored from this point.
-   * 
-   * to seed the kbest extraction, it only needs that each hyperedge should have the best_cost
-   * properly set, and it does not require any list being sortedinstead, the priority queue
-   * heap_cands will do internal sorting
+   * record which hypotheses have been explored from this point. There is one virtual node for
+   * each HGNode in the underlying hypergraph. This VirtualNode maintains information about the
+   * k-best derivations from that point on, retaining the derivations computed so far and a priority 
+   * queue of candidates.
    */
 
   private class VirtualNode {
@@ -252,8 +280,9 @@ public class KBestExtractor {
     // remember frontier states, best-first; in the paper, it is called cand[v]
     private PriorityQueue<DerivationState> candHeap = null;
 
-    // remember which DerivationState has been explored; why duplicate,
-    // e.g., 1 2 + 1 0 == 2 1 + 0 1
+    // Remember which DerivationState has been explored (positions in the hypercube). This allows
+    // us to avoid duplicated states that are reached from different places of expansion, e.g.,
+    // position (2,2) can be reached be extending (1,2) and (2,1).
     private HashSet<DerivationState> derivationTable = null;
 
     // This records unique *strings* at each item, used for unique-nbest-string extraction.
@@ -300,8 +329,7 @@ public class KBestExtractor {
           if (extractUniqueNbest) {
             // We pass false for extract_nbest_tree because we want; to check that the hypothesis
             // *strings* are unique, not the trees.
-            boolean useTreeFormat = false;
-            String res_str = derivationState.getHypothesis(useTreeFormat, null, null, defaultSide);
+            String res_str = derivationState.getHypothesis();
             if (!uniqueStringsTable.contains(res_str)) {
               nbests.add(derivationState);
               uniqueStringsTable.add(res_str);
@@ -399,7 +427,7 @@ public class KBestExtractor {
      */
     private void getCandidates(KBestExtractor kbestExtractor) {
       /* The list of candidates extending from this (virtual) node. */
-      candHeap = new PriorityQueue<DerivationState>();
+      candHeap = new PriorityQueue<DerivationState>(11, new DerivationStateComparator());
 
       /*
        * When exploring the cube frontier, there are multiple paths to each candidate. For example,
@@ -448,7 +476,7 @@ public class KBestExtractor {
       // TODO: if tem.size is too large, this may cause unnecessary computation, we comment the
       // segment to accommodate the unique nbest extraction
       /*
-       * if(tem.size()>global_n){ heap_cands=new PriorityQueue<DerivationState>(); for(int i=1;
+       * if(tem.size()>global_n){ heap_cands=new PriorityQueue<DerivationState>(new DerivationStateComparator()); for(int i=1;
        * i<=global_n; i++) heap_cands.add(tem.poll()); }else heap_cands=tem;
        */
     }
@@ -490,7 +518,7 @@ public class KBestExtractor {
           childVirtualNode.lazyKBestExtractOnNode(kbestExtractor, ranks[i]);
         }
       }
-      cost = (float) -hyperEdge.getBestDerivationScore();
+      cost = (float) hyperEdge.getBestDerivationScore();
 
       DerivationState state = new DerivationState(parentNode, hyperEdge, ranks, cost, edgePos);
       if (joshuaConfiguration.rescoreForest)
@@ -500,32 +528,34 @@ public class KBestExtractor {
     }
   };
 
-  // ===============================================
-  // class DerivationState
-  // ===============================================
-  /*
-   * each Node will maintain a list of this, each of which corresponds to a hyperedge and its
-   * children's ranks. remember the ranks of a hyperedge node used for kbest extraction
+  /**
+   * A DerivationState describes which path to follow through the hypergraph. For example, it
+   * might say to use the 1-best from the first tail node, the 9th-best from the second tail node,
+   * and so on. This information is represented recursively through a chain of DerivationState
+   * objects. This function follows that chain, extracting the information according to a number
+   * of parameters, and returning results to a string, and also (optionally) accumulating the
+   * feature values into the passed-in FeatureVector.
    */
 
   // each DerivationState roughly corresponds to a hypothesis
-  private class DerivationState implements Comparable<DerivationState> {
+  public class DerivationState {
     /* The edge ("e" in the paper) */
-    HyperEdge edge;
+    public HyperEdge edge;
 
     /* The edge's parent node */
-    HGNode parentNode;
+    public HGNode parentNode;
 
     /*
-     * This state's position in its parent's Item.l_hyperedges (used for signature calculation).
+     * This state's position in its parent node's list of incoming hyperedges (used in signature
+     * calculation)
      */
-    int edgePos;
+    public int edgePos;
 
     /*
      * The rank item to select from each of the incoming tail nodes ("j" in the paper, an ArrayList
      * of size |e|)
      */
-    int[] ranks;
+    public int[] ranks;
 
     /*
      * The cost of the hypothesis, including a weighted BLEU score, if any.
@@ -597,7 +627,7 @@ public class KBestExtractor {
      * @return
      */
     public float getCost() {
-      return cost - weights.get("BLEU") * bleu;
+      return cost - weights.getSparse("BLEU") * bleu;
     }
 
     public String toString() {
@@ -644,234 +674,368 @@ public class KBestExtractor {
     }
 
     /**
-     * Returns a string representing the derivation of a hypothesis, with each rule application
-     * listed one per line in an indented fashion.
-     * 
-     * @param kbestExtractor
-     * @param useTreeFormat
-     * @param features
-     * @param models
-     * @return a string representation of the derivation
+     * Visits every state in the derivation in a depth-first order.
      */
-    private String getDerivation(FeatureVector features, List<FeatureFunction> models, int indent) {
-
-      StringBuffer sb = new StringBuffer();
-      Rule rule = edge.getRule();
-
-      FeatureVector transitionFeatures = new FeatureVector();
-      if (null != features) {
-        computeCost(parentNode, edge, transitionFeatures, models);
-        features.add(transitionFeatures);
-      }
-
-      for (int i = 0; i < indent; i++)
-        sb.append(" ");
-
-      /* The top-level item. */
-      if (null == rule) {
-        StringBuilder childString = new StringBuilder();
-        childString.append(getChildDerivationState(edge, 0).getDerivation(features, models,
-            indent + 2));
-
-        sb.append(Vocabulary.word(rootID)).append(
-            " ||| " + transitionFeatures + " ||| " + features + " ||| "
-                + -weights.innerProduct(features));
-        sb.append("\n");
-        sb.append(childString);
-
-      } else {
-
-        StringBuilder childStrings = new StringBuilder();
-        if (edge.getTailNodes() != null) {
-          for (int id = 0; id < edge.getTailNodes().size(); id++) {
-            childStrings.append(getChildDerivationState(edge, id).getDerivation(features, models,
-                indent + 2));
-          }
-        }
-
-        // sb.append(rule).append(" ||| " + features + " ||| " +
-        // KBestExtractor.this.weights.innerProduct(features));
-        sb.append(String.format("%d-%d", parentNode.i, parentNode.j));
-        sb.append(" ||| " + Vocabulary.word(rule.getLHS()) + " -> "
-            + Vocabulary.getWords(rule.getFrench()) + " /// " + rule.getEnglishWords());
-        sb.append(" |||");
-        for (DPState state : parentNode.getDPStates()) {
-          sb.append(" " + state);
-        }
-        sb.append(" ||| " + transitionFeatures);
-        sb.append(" ||| " + -weights.innerProduct(transitionFeatures));
-        sb.append("\n");
-        sb.append(childStrings);
-      }
-      return sb.toString();
+    private DerivationVisitor visit(DerivationVisitor visitor) {
+      return visit(visitor, 0);
     }
 
-    /**
-     * A DerivationState describes which path to follow through the hypergraph. For example, it
-     * might say to use the 1-best from the first tail node, the 9th-best from the second tail node,
-     * and so on. This information is represented recursively through a chain of DerivationState
-     * objects. This function follows that chain, extracting the information according to a number
-     * of parameters, and returning results to a string, and also (optionally) accumulating the
-     * feature values into the passed-in FeatureVector.
-     * 
-     * If "features" is null, then no replaying of feature functions is necessary.
-     * 
-     * @param kbestExtractor
-     * @param useTreeFormat
-     * @param features
-     * @param models
-     * @param side
-     * @return
-     */
-    private String getHypothesis(boolean useTreeFormat, FeatureVector features,
-        List<FeatureFunction> models, Side side) {
-      // ### accumulate cost of p_edge into model_cost if necessary
-      if (null != features) {
-        computeCost(parentNode, edge, features, models);
-      }
+    private DerivationVisitor visit(DerivationVisitor visitor, int indent) {
 
-      // ### get hyp string recursively
-      StringBuffer sb = new StringBuffer();
+      visitor.before(this, indent);
+
       Rule rule = edge.getRule();
 
-      if (null == rule) { // Hyperedges under the "goal item" have a null rule
-        if (useTreeFormat) {
-          // res.append("(ROOT ");
-          sb.append('(');
-          sb.append(Vocabulary.word(rootID));
-          if (includeAlign) {
-            // append "{i-j}"
-            sb.append('{');
-            sb.append(parentNode.i);
-            sb.append('-');
-            sb.append(parentNode.j);
-            sb.append('}');
-          }
-          sb.append(' ');
-        }
-        for (int id = 0; id < edge.getTailNodes().size(); id++) {
-          sb.append(getChildDerivationState(edge, id).getHypothesis(useTreeFormat,
-              features, models, side));
-          if (id < edge.getTailNodes().size() - 1)
-            sb.append(' ');
-        }
-        if (useTreeFormat)
-          sb.append(')');
+      if (null == rule) {
+        getChildDerivationState(edge, 0).visit(visitor, indent + 1);
       } else {
-        if (useTreeFormat) {
-          sb.append('(');
-          int lhs = rule.getLHS();
-          if (lhs > 0) {
-            System.err.printf("k-best: WARNING: rule LHS is greater than 0: %d\n", lhs);
-          }
-          sb.append(Vocabulary.word(lhs));
-          if (includeAlign) {
-            // append "{i-j}"
-            sb.append('{');
-            sb.append(parentNode.i);
-            sb.append('-');
-            sb.append(parentNode.j);
-            sb.append('}');
-          }
-          sb.append(' ');
-        }
-        if (side == Side.TARGET) {
+        if (edge.getTailNodes() != null) {
           int[] english = rule.getEnglish();
           for (int c = 0; c < english.length; c++) {
-            if (Vocabulary.idx(english[c])) {
+            if (Vocabulary.nt(english[c])) {
               int index = -(english[c] + 1);
-              sb.append(getChildDerivationState(edge, index).getHypothesis(useTreeFormat, features, 
-                  models, side));
-            } else {
-              if (joshuaConfiguration.parse
-                  || useTreeFormat
-                  || (english[c] != Vocabulary.id(Vocabulary.START_SYM) && english[c] != Vocabulary
-                      .id(Vocabulary.STOP_SYM)))
-                sb.append(Vocabulary.word(english[c]));
+              getChildDerivationState(edge, index).visit(visitor, indent + 1);
             }
-            if (c < english.length - 1)
-              sb.append(' ');
-          }
-        } else if (side == Side.SOURCE) {
-          int[] french = rule.getFrench();
-          int nonTerminalID = 0;// the position of the non-terminal in the rule
-          for (int c = 0; c < french.length; c++) {
-            if (Vocabulary.nt(french[c])) {
-              sb.append(getChildDerivationState(edge, nonTerminalID).getHypothesis(useTreeFormat, 
-                  features, models, side));
-              nonTerminalID++;
-            } else {
-              sb.append(Vocabulary.word(french[c]));
-            }
-            if (c < french.length - 1)
-              sb.append(' ');
           }
         }
-        if (useTreeFormat)
-          sb.append(')');
       }
-      return sb.toString().trim();
+
+      visitor.after(this, indent);
+
+      return visitor;
     }
 
-    // private void getNumNodesAndEdges(KBestExtractor kbestExtractor, int[] numNodesAndEdges) {
-    // if(edge.getAntNodes()!=null) {
-    // for (int id = 0; id < edge.getAntNodes().size(); id++) {
-    // getChildDerivationState(kbestExtractor, edge, id).getNumNodesAndEdges(kbestExtractor,
-    // numNodesAndEdges) ;
-    // }
-    // }
-    // numNodesAndEdges[0]++;
-    // numNodesAndEdges[1]++;
-    // }
+    private String getHypothesis() {
+      return getHypothesis(defaultSide);
+    }
+
+    private String getTree() {
+      return visit(new TreeExtractor()).toString();
+    }
+
+    private String getHypothesis(Side side) {
+      return visit(new HypothesisExtractor(side)).toString();
+    }
+
+    private FeatureVector replayFeatures() {
+      FeatureReplayer fp = new FeatureReplayer();
+      visit(fp);
+      return fp.getFeatures();
+    }
+
+    private String getDerivation() {
+      return visit(new DerivationExtractor()).toString();
+    }
 
     /**
      * Helper function for navigating the hierarchical list of DerivationState objects. This
      * function looks up the VirtualNode corresponding to the HGNode pointed to by the edge's
      * {tailNodeIndex}th tail node.
      * 
-     * @param kbestExtractor
      * @param edge
      * @param tailNodeIndex
      * @return
      */
-    private DerivationState getChildDerivationState(HyperEdge edge, int tailNodeIndex) {
+    public DerivationState getChildDerivationState(HyperEdge edge, int tailNodeIndex) {
       HGNode child = edge.getTailNodes().get(tailNodeIndex);
       VirtualNode virtualChild = getVirtualNode(child);
       return virtualChild.nbests.get(ranks[tailNodeIndex] - 1);
     }
 
-    /**
-     * Replay the feature functions in order to record the actual feature values, since only the
-     * inner product is stored during decoding. Note that if features is null, we short-circuit this
-     * computation, since it's expensive. We only need the feature values if the k-best extractor
-     * asked for them.
-     * 
-     * @param parentNode
-     * @param edge
-     * @param features
-     * @param models
-     */
-    private void computeCost(HGNode parentNode, HyperEdge edge, FeatureVector features,
-        List<FeatureFunction> models) {
+  } // end of Class DerivationState
 
-      if (null == features)
-        return;
-
-      FeatureVector transitionCosts = ComputeNodeResult.computeTransitionFeatures(models, edge,
-          parentNode.i, parentNode.j, sentence.id());
-
-      features.subtract(transitionCosts);
-    }
-
+  public static class DerivationStateComparator implements Comparator<DerivationState> {
     // natural order by cost
-    public int compareTo(DerivationState another) {
-      if (this.getCost() < another.getCost()) {
+    public int compare(DerivationState one, DerivationState another) {
+      if (one.getCost() > another.getCost()) {
         return -1;
-      } else if (this.getCost() == another.getCost()) {
+      } else if (one.getCost() == another.getCost()) {
         return 0;
       } else {
         return 1;
       }
     }
-  } // end of Class DerivationState
+  }
+
+  /**
+   * This interface provides a generic way to do things at each stage of a derivation. The
+   * DerivationState::visit() function visits every node in a derivation and calls the
+   * DerivationVisitor functions both before and after it visits each node. This provides a common
+   * way to do different things to the tree (e.g., extract its words, assemble a derivation, and so
+   * on) without having to rewrite the node-visiting code.
+   * 
+   * @author Matt Post <post@cs.jhu.edu>
+   */
+  public interface DerivationVisitor {
+    /**
+     * Called before each node's children are visited.
+     *
+     * @param state the derivation state
+     * @param level the tree depth
+     */
+    void before(DerivationState state, int level);
+
+    /**
+     * Called after a node's children have been visited.
+     * 
+     * @param state the derivation state
+     * @param level the tree depth
+     */
+    void after(DerivationState state, int level);
+  }
+
+  /**
+   * Extracts the hypothesis from the leaves of the tree using the generic (depth-first) visitor.
+   * Since we're using the visitor, we can't just print out the words as we see them. We have to
+   * print the words to the left of the nonterminal, then recursively print that nonterminal, then
+   * the words after it, and so on. To accomplish this, we add rules to a stack, merging the words
+   * from terminal productions into the most recent nonterminal in the stack.
+   * 
+   */
+  public class HypothesisExtractor implements DerivationVisitor {
+
+    private Side side;
+    private Stack<String> outputs;
+
+    public HypothesisExtractor(Side side) {
+      this.side = side;
+      outputs = new Stack<String>();
+    }
+
+    String ntMatcher = ".*" + Rule.NT_REGEX + ".*";
+
+    void merge(String words) {
+      if (!words.matches(ntMatcher) && outputs.size() > 0 && outputs.peek().matches(ntMatcher)) {
+        String parentWords = outputs.pop();
+        String replaced = parentWords.replaceFirst(Rule.NT_REGEX, Matcher.quoteReplacement(words));
+
+        merge(replaced);
+      } else {
+        outputs.add(words);
+      }
+    }
+
+    @Override
+    /**
+     * Whenever we reach a rule in the depth-first derivaiton, we add it to the stack
+     * via a call to the merge() function.
+     */
+    public void before(DerivationState state, int level) {
+      Rule rule = state.edge.getRule();
+      if (rule != null)
+        if (side == Side.TARGET) {
+          // Output the alignment Moses-style, skipping <s> and </s>, and converting to indices
+          // in original sentence
+          String alignment = "";
+          if (joshuaConfiguration.include_align_index 
+              && state.parentNode.j != sentence.length() && state.parentNode.j != 1) {
+            int i = state.parentNode.j - 1 - state.edge.getRule().getFrench().length + state.edge.getRule().getArity();
+            alignment = String.format(" |%d-%d|", i, state.parentNode.j-2);
+          }
+          merge(String.format("%s%s", state.edge.getRule().getEnglishWords(), alignment));
+        } else
+          merge(state.edge.getRule().getFrenchWords());
+
+    }
+
+    @Override
+    public void after(DerivationState state, int level) {
+    }
+
+    /**
+     * After all rules in the grammar have been merged, there should be one item on the stack, which
+     * is the complete target (or source) string.
+     */
+    public String toString() {
+      return outputs.pop().replaceAll("<s> ", "").replace(" </s>", "");
+    }
+  }
+
+  /**
+   * Assembles a Penn treebank format tree for a given derivation.
+   */
+  public class TreeExtractor implements DerivationVisitor {
+
+    /* The tree being built. */
+    private Tree tree;
+
+    public TreeExtractor() {
+      tree = null;
+    }
+
+    /**
+     * Before visiting the children, find the fragment representation for the current rule,
+     * and merge it into the tree we're building.
+     */
+    @Override
+    public void before(DerivationState state, int indent) {
+      HyperEdge edge = state.edge;
+      Rule rule = edge.getRule();
+
+      // Skip the special top-level rule
+      if (rule == null) {
+        return;
+      }
+
+      String lhs = Vocabulary.word(rule.getLHS());
+      String unbracketedLHS = lhs.substring(1, lhs.length() - 1);
+
+      /* Find the fragment corresponding to this flattened rule in the fragment map; if it's not
+       * there, just pretend it's a depth-one rule.
+       */
+      Tree fragment = Tree.getFragmentFromYield(rule.getEnglishWords());
+      if (fragment == null) {
+        String subtree = String.format("(%s{%d-%d} %s)", unbracketedLHS, 
+            state.parentNode.i, state.parentNode.j, 
+            quoteTerminals(rule.getEnglishWords()));
+        fragment = Tree.fromString(subtree);
+      }
+      
+      merge(fragment);
+    }
+
+    /**
+     * Quotes just the terminals in the yield of a tree, represented as a string. This is to force
+     * compliance with the Tree class, which interprets all non-quoted strings as nonterminals. 
+     * 
+     * @param words a string of words representing a rule's yield
+     * @return
+     */
+    private String quoteTerminals(String words) {
+      String quotedWords = "";
+      for (String word: words.split("\\s+"))
+        if (word.startsWith("[") && word.endsWith("]"))
+          quotedWords += String.format("%s ", word);
+        else
+        quotedWords += String.format("\"%s\" ", word);
+
+      return quotedWords.substring(0, quotedWords.length() - 1);
+    }
+
+    @Override
+    public void after(DerivationState state, int indent) {
+      // do nothing
+    }
+
+    public String toString() {
+      return tree.unquotedString();
+    }
+
+    /**
+     * Either set the root of the tree or merge this tree by grafting it onto the first nonterminal
+     * in the yield of the parent tree.
+     * 
+     * @param fragment
+     */
+    private void merge(Tree fragment) {
+      if (tree == null) {
+        tree = fragment;
+      } else {
+        Tree parent = tree.getNonterminalYield().get(0);
+        parent.setLabel(Vocabulary.word(fragment.getLabel()));
+        parent.setChildren(fragment.getChildren());
+      }
+    }
+  }
+
+  /**
+   * Assembles an informative version of the derivation. Each rule is printed as it is encountered.
+   * Don't try to parse this output; make something that writes out JSON or something, instead.
+   * 
+   * @author Matt Post <post@cs.jhu.edu
+   */
+  public class DerivationExtractor implements DerivationVisitor {
+
+    StringBuffer sb;
+
+    public DerivationExtractor() {
+      sb = new StringBuffer();
+    }
+
+    @Override
+    public void before(DerivationState state, int indent) {
+
+      HyperEdge edge = state.edge;
+      Rule rule = edge.getRule();
+
+      if (rule != null) {
+
+        for (int i = 0; i < indent * 2; i++)
+          sb.append(" ");
+
+        FeatureReplayer replayer = new FeatureReplayer();
+        replayer.before(state, indent);
+        FeatureVector transitionFeatures = replayer.getFeatures();
+
+        // sb.append(rule).append(" ||| " + features + " ||| " +
+        // KBestExtractor.this.weights.innerProduct(features));
+        sb.append(String.format("%d-%d", state.parentNode.i, state.parentNode.j));
+        sb.append(" ||| " + Vocabulary.word(rule.getLHS()) + " -> "
+            + Vocabulary.getWords(rule.getFrench()) + " /// " + rule.getEnglishWords());
+        sb.append(" |||");
+        for (DPState dpState : state.parentNode.getDPStates()) {
+          sb.append(" " + dpState);
+        }
+        sb.append(" ||| " + transitionFeatures);
+        sb.append(" ||| " + weights.innerProduct(transitionFeatures));
+        if (rule.getAlignment() != null)
+          sb.append(" ||| " + Arrays.toString(rule.getAlignment()));
+        sb.append("\n");
+      }
+    }
+
+    public String toString() {
+      return sb.toString();
+    }
+
+    @Override
+    public void after(DerivationState state, int level) {
+      // TODO Auto-generated method stub
+    }
+  }
+
+  /**
+   * During decoding, individual features values are not stored, only the model score on each edge.
+   * This saves space. If you want to print the actual feature values, they have to be assembled
+   * from the edges of the derivation, which means replaying the feature functions. This visitor
+   * does just that, using the generic derivation visitor.
+   */
+  public class FeatureReplayer implements DerivationVisitor {
+
+    private FeatureVector features;
+
+    public FeatureReplayer() {
+      features = new FeatureVector();
+    }
+
+    public FeatureReplayer(FeatureVector useThese) {
+      features = useThese;
+    }
+
+    public FeatureVector getFeatures() {
+      return features;
+    }
+
+    /**
+     * We could do this in either before() or after().
+     */
+    @Override
+    public void before(DerivationState state, int level) {
+      if (features != null) {
+        HGNode parentNode = state.parentNode;
+        
+        HyperEdge edge = state.edge;
+
+        FeatureVector transitionCosts = ComputeNodeResult.computeTransitionFeatures(models, edge,
+            parentNode.i, parentNode.j, sentence);
+
+        features.add(transitionCosts);
+      }
+    }
+
+    @Override
+    public void after(DerivationState state, int level) {
+      // Nothing to do
+    }
+  }
 }

@@ -28,7 +28,7 @@ public class ViterbiExtractor {
     }
     int[] english = rl.getEnglish();
     for (int c = 0; c < english.length; c++) {
-      if (Vocabulary.idx(english[c])) {
+      if (Vocabulary.nt(english[c])) {
         int id = -(english[c] + 1);
         HGNode child = (HGNode) edge.getTailNodes().get(id);
         res.append(extractViterbiString(child));
@@ -43,8 +43,8 @@ public class ViterbiExtractor {
   // ######## find 1best hypergraph#############
   public static HyperGraph getViterbiTreeHG(HyperGraph hg_in) {
     HyperGraph res =
-        new HyperGraph(cloneNodeWithBestHyperedge(hg_in.goalNode), -1, -1, hg_in.sentID,
-            hg_in.sentLen); // TODO: number of items/deductions
+        new HyperGraph(cloneNodeWithBestHyperedge(hg_in.goalNode), -1, -1, null); 
+    // TODO: number of items/deductions
     get1bestTreeNode(res.goalNode);
     return res;
   }
@@ -88,7 +88,7 @@ public class ViterbiExtractor {
     List<HyperEdge> hyperedges = new ArrayList<HyperEdge>(1);
     HyperEdge cloneEdge = cloneHyperedge(inNode.bestHyperedge);
     hyperedges.add(cloneEdge);
-    return new HGNode(inNode.i, inNode.j, inNode.lhs, hyperedges, cloneEdge, inNode.dpStates);
+    return new HGNode(inNode.i, inNode.j, inNode.lhs, hyperedges, cloneEdge, inNode.getDPStates());
   }
 
 

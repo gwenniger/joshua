@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 # Matt Post <post@cs.jhu.edu>
 
-# Converts a Moses grammar to a Joshua grammar.
+# Converts a Moses grammars and phrase tables to a Joshua grammar.
 #
 # Usage: cat grammar.moses | moses2joshua_grammar.pl > grammar.joshua
 #
@@ -9,14 +9,17 @@
 #
 # (1) The rule syntax. Moses' rules look like this:
 # 
-#     der [X][NN] [X] ||| of the [X][NN] [PP] ||| 0-0 0-1 1-2 ||| 1 ||| |||
+#     der [X][NN] [X] ||| of the [X][NN] [PP] ||| 0-0 0-1 1-2 ||| .301 .6989 ||| |||
 #
 # Whereas the corresponding Joshua rule looks like this:
 # 
-#     [PP] ||| der [NN] ||| of the [NN] ||| 1
+#     [PP] ||| der [NN,1] ||| of the [NN,1] ||| 0.5 0.2
 #
-# (2) Phrase table values. Joshua negates the phrase table feature values upon reading them in,
-# whereas Moses (more sensibly) does not.
+# (This doesn't apply to phrase tables, of course).
+#
+# (2) Phrase table values. Moses takes the log of each feature, whereas Joshua takes just
+#     negates the values when it reads them in. To make the conversion correct, this script
+#     computes the negative log of each of the feature values.
 
 use strict;
 use warnings;
@@ -24,17 +27,25 @@ use File::Basename;
 use Getopt::Std;
 
 my %opts;
-getopts("i:d:x",\%opts);
+getopts("m:p",\%opts);
 
 sub usage {
-  print "Usage: cat moses.grammar | moses2joshua_grammar.pl > joshua.grammar\n";
+  print "Usage: cat moses.grammar | moses2joshua_grammar.pl [-p] [-m TREE_MAP_FILE] > grammar\n";
+  print "where TREE_MAP_FILE maps rule target-sides to internal trees\n";
+  print "where -p means to add a phrase penalty feature\n";
+
   exit;
 }
 
-  # Rules look like these:
-  # <s> [X] ||| <s> [S] ||| 1 ||| ||| 0
+  # Rules look like the following, with many of the fields optional
+  #
+  # <s> [X] ||| <s> [S] ||| [weights] ||| [alignments] ||| [counts] ||| [tree]
   # [X][S] </s> [X] ||| [X][S] </s> [S] ||| 1 ||| 0-0 ||| 0
   # [X][S] [X][X] [X] ||| [X][S] [X][X] [S] ||| 2.718 ||| 0-0 1-1 ||| 0
+
+if ($opts{m}) {
+  open MAP, ">$opts{m}" or die "can't write map to file '$opts{m}'";
+}
 
 while (my $rule = <>) {
   chomp($rule);
@@ -44,18 +55,22 @@ while (my $rule = <>) {
 # ! es [X][VP] , [X] ||| , we [X][VP] , [PRN] ||| 0.0102041 0.00950695 1 0.000537615 2.718 ||| 2-2 ||| 98 1
 # ! es [X][VP] [X][,] [X] ||| , we [X][VP] [X][,] [PRN] ||| 0.0120482 0.0206611 1 0.000867691 2.718 ||| 2-2 3-3 ||| 83 1
 
-  # Joshua doesn't support tree-to-string (currently), so we get rid of the source-side
-  # nonterminal. This also simplifies later processing.
-  $rule =~ s/ \[\S+?\](\[\S+?\])/ $1/g;
+  # Get rid of the source-side nonterminal.
+  $rule =~ s/( ?)\[\S+?\](\[\S+?\])/$1$2/g;
 
-  my ($l1, $l2, $probs, $alignment, $counts) = split(/\|\|\|/, $rule);
+  my ($l1, $l2, $probs, $alignment, $counts, undef, $tree) = split(/\s*\|\|\|\s*/, $rule);
 
   # The source-side nonterminals (of each pair) have been removed. Here we push all the for the
   # source and target sides into arrays. We grab the LHS from the target side list.
   my (@l1tokens) = split(' ', $l1);
-  pop(@l1tokens);
   my (@l2tokens) = split(' ', $l2);
-  my $lhs = pop(@l2tokens);
+
+  # Support regular phrase tables, too (with no LHS).
+  my $lhs = undef;
+  if ($l2tokens[-1] =~ /^\[.*\]$/) {
+    pop(@l1tokens);
+    $lhs = pop(@l2tokens);
+  }
 
   # Now build a list of just the nonterminals. Then for the target side (L2), we map positions in
   # the string to its index in the list of nonterminals, used to discover the permutation later on.
@@ -99,41 +114,68 @@ while (my $rule = <>) {
   }
 
   # Now go on and print the rule.
-  my $new_rule = "$lhs |||";
+  my $new_rule;
+  if ($lhs) {
+    $new_rule = "$lhs ||| ";
+  } else {
+    $new_rule = "";
+  }
   $num_lhs_seen = 0;
   foreach my $token (@l1tokens) {
     if ($token =~ /\[(\S+?)\]/g) {
-      $new_rule .= " [$1," . (++$num_lhs_seen) . "]";
+      $new_rule .= "[$1," . (++$num_lhs_seen) . "] ";
     } else {
-      $new_rule .= " $token";
+      $new_rule .= "$token ";
     }
   }
 
-  $new_rule .= " |||";
+  $new_rule .= "||| ";
 
   $num_lhs_seen = 0;
+  my $target = "";
   foreach my $token (@l2tokens) {
     if ($token =~ /\[(\S+?)\]/g) {
-      $new_rule .= " [$1," . $permutation[$num_lhs_seen++] . "]";
+      $target .= "[$1," . $permutation[$num_lhs_seen++] . "] ";
     } else {
-      $new_rule .= " $token";
+      $target .= "$token ";
     }
   }
+  $target =~ s/^\s+//;
+  $new_rule .= $target;
 
   my @probs = map { transform($_) } (split(' ',$probs));
+  # Moses no longer uses exp(1) as its phrase penalty feature, so we can't
+  # rely on the uniform transform above...
+  push(@probs, -1) if ($opts{p});
   my $scores = join(" ", map { sprintf("%.5f", $_) } @probs);
 
-  $new_rule .= " ||| $scores";
+#  $new_rule .= " ||| $scores ||| $alignment ||| $counts";
+  $new_rule .= "||| $scores ||| $alignment";
 
-  # print STDERR "  NEW_RULE: $new_rule$/";
+  # print STDERR "  NEW_RULE: $rule => $new_rule$/" if $new_rule =~ /^\|/;
   print "$new_rule\n";
+
+  if ($opts{m} and defined $tree) {
+    $tree =~ s/.*{{Tree\s+(.*)}}.*/$1/;
+    # Remove brackets around substitution points
+    $tree =~ s/\[([^\[\]\s]+)\]/$1/g;
+    # Add quotes around terminals
+    $tree =~ s/\[([^\[\]]+) ([^\[\]]+)\]/[$1 "$2"]/g;
+    $tree =~ s/\[/(/g;
+    $tree =~ s/\]/)/g;
+
+    print MAP "$tree ||| $target\n";
+  }
 }
+
+close(MAP) if ($opts{m});
 
 sub transform {
   my ($weight) = @_;
 
   # Moses defines the log_e() of non-positive weights as -100
-  return "-100" if ($weight <= 0.0);
+  # Return -1 times this, since Joshua negates all feature weights from the grammar
+  return "100" if ($weight <= 0.0);
   
   # if ($weight eq "2.718") {
   # 	return $weight;

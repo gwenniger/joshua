@@ -6,6 +6,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import joshua.corpus.Vocabulary;
+import joshua.decoder.Decoder;
 import joshua.util.io.LineReader;
 
 /**
@@ -46,7 +47,7 @@ public abstract class GrammarReader<R extends Rule> implements Iterable<R>, Iter
           + (null != e.getMessage() ? e.getMessage() : "No details available. Sorry."), e);
     }
 
-    System.err.println(String.format("Reading grammar from file %s...", fileName));
+    Decoder.LOG(1, String.format("Reading grammar from file %s...", fileName));
     numRulesRead = 0;
     advanceReader();
   }
@@ -80,6 +81,7 @@ public abstract class GrammarReader<R extends Rule> implements Iterable<R>, Iter
    * 
    * @see joshua.util.io.LineReader
    */
+  @Override
   protected void finalize() throws Throwable {
     if (this.reader != null) {
       logger.severe("Grammar file stream was not closed, this indicates a coding error: "
@@ -90,6 +92,7 @@ public abstract class GrammarReader<R extends Rule> implements Iterable<R>, Iter
     super.finalize();
   }
 
+  @Override
   public boolean hasNext() {
     return lookAhead != null;
   }
@@ -103,18 +106,42 @@ public abstract class GrammarReader<R extends Rule> implements Iterable<R>, Iter
     }
     if (lookAhead == null && reader != null) {
       this.close();
-      System.err.println("...done.");
     }
   }
 
+  /**
+   * Read the next line, and print reader progress.
+   */
+  @Override
   public R next() {
     String line = lookAhead;
-    advanceReader();
 
-    if ((numRulesRead) % 80000 == 0) {
-      System.err.println(String.format("%d rules read", numRulesRead));
-    } else if ((numRulesRead) % 1000 == 0) {
-      System.err.print(".");
+    int oldProgress = reader.progress();
+    advanceReader();
+    
+    if (Decoder.VERBOSE >= 1) {
+      int newProgress = (reader != null) ? reader.progress() : 100;
+
+      if (newProgress > oldProgress) {
+        for (int i = oldProgress + 1; i <= newProgress; i++)
+          if (i == 97) {
+            System.err.print("1");
+          } else if (i == 98) {
+            System.err.print("0");
+          } else if (i == 99) {
+            System.err.print("0");
+          } else if (i == 100) {
+            System.err.println("%");
+          } else if (i % 10 == 0) {
+            System.err.print(String.format("%d", i));
+            System.err.flush();
+          } else if ((i - 1) % 10 == 0)
+            ; // skip at 11 since 10, 20, etc take two digits
+          else {
+            System.err.print(".");
+            System.err.flush();
+          }
+      }
     }
     return parseLine(line);
   }
@@ -126,14 +153,24 @@ public abstract class GrammarReader<R extends Rule> implements Iterable<R>, Iter
 
   public abstract String toWordsWithoutFeatureScores(R rule);
 
-  public int cleanNonTerminal(int tokenID) {
+  /**
+   * Removes square brackets (and index, if present) from nonterminal id 
+   * @param tokenID
+   * @return cleaned ID
+   */
+  public static int cleanNonTerminal(int tokenID) {
     // cleans NT of any markup, e.g., [X,1] may becomes [X], depending
     return Vocabulary.id(cleanNonTerminal(Vocabulary.word(tokenID)));
   }
 
-  public String cleanNonTerminal(String word) {
+  /**
+   * Removes square brackets (and index, if present) from nonterminal id 
+   * @param token
+   * @return cleaned token
+   */
+  public static String cleanNonTerminal(String token) {
     // cleans NT of any markup, e.g., [X,1] may becomes [X], depending on nonTerminalCleanRegEx
-    return word.replaceAll(nonTerminalCleanRegEx, "");
+    return token.replaceAll(nonTerminalCleanRegEx, "");
   }
 
   public static boolean isNonTerminal(final String word) {

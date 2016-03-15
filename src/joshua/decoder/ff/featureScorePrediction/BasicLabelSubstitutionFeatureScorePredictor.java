@@ -3,10 +3,12 @@ package joshua.decoder.ff.featureScorePrediction;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.junit.Assert;
+
 import joshua.decoder.ff.FeatureVector;
 import joshua.decoder.ff.LabelSubstitutionFF;
 import joshua.decoder.ff.LabelSubstitutionFF.LabelSubstitutionLabelSmoother;
-import junit.framework.Assert;
+
 
 public class BasicLabelSubstitutionFeatureScorePredictor implements FeatureScorePredictor {
 
@@ -52,7 +54,7 @@ public class BasicLabelSubstitutionFeatureScorePredictor implements FeatureScore
     for (String featureString : featureVector.keySet()) {
       if (isRelevantFeature(featureTypePrefix, featureString)) {
         SubstitutionPair substitutionPair = getSubstitutionPair(featureTypePrefix, featureString);
-        Float score = featureVector.get(featureString);
+        Float score = featureVector.getWeight(featureString);
         result.put(substitutionPair, score);
       }
     }
