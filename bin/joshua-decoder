@@ -26,8 +26,12 @@ set -u
 
 JOSHUA=$(dirname $0)/..
 
+CLASSPATH=$JOSHUA/class:$JOSHUA/ext/berkeleylm/jar/berkeleylm.jar:$JOSHUA/lib/gson-2.5.jar:$JOSHUA/lib/junit-4.10.jar 
+
+#echo "CLASSPATH: " $CLASSPATH
+
 exec java -Xmx${mem} \
- 	-cp $JOSHUA/class:$JOSHUA/ext/berkeleylm/jar/berkeleylm.jar:$JOSHUA/lib/gson-2.5.jar \
+ 	-cp $CLASSPATH \
 	-Dfile.encoding=utf8 \
 	-Djava.util.logging.config.file=${JOSHUA}/logging.properties \
 	-Djava.library.path=$JOSHUA/lib \

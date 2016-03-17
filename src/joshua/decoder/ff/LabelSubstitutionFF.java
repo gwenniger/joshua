@@ -50,13 +50,16 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
   public LabelSubstitutionFF(FeatureVector weights, String[] args, JoshuaConfiguration config) {
     super(weights, "LabelSubstitution", args, config);
     this.joshuaConfiguration = config;
-    this.labelSmoothersList = null;
+    this.labelSmoothersList = createNoSmoothingLabelSubstiontionSmoothersList();
+    if(this.labelSmoothersList == null){
+      throw new RuntimeException("Error: label smoothers list is null");
+    }
   }
 
   protected LabelSubstitutionFF(FeatureVector weights, String[] args, JoshuaConfiguration config, String featureName) {
     super(weights, featureName, args, config);
     this.joshuaConfiguration = config;
-    this.labelSmoothersList = null;
+    this.labelSmoothersList = createNoSmoothingLabelSubstiontionSmoothersList();
   }
   
   
@@ -472,29 +475,7 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
     }
   }
 
-  private static class LabelSubstitutionSparseFF extends LabelSubstitutionFF {
   
-    public LabelSubstitutionSparseFF (FeatureVector weights, String[] args, JoshuaConfiguration config) {
-      super(weights, args, config, "LabelSubstitutionSparse");
-    }
-
-    private LabelSubstitutionSparseFF(FeatureVector weights, String name,
-        JoshuaConfiguration joshuaConfiguration,
-        List<LabelSubstitutionLabelSmoother> labelSmoothersList) {
-          super(weights, new String[0], joshuaConfiguration, "LabelSubstitutionSparse");
-          this.labelSmoothersList = labelSmoothersList;
-    }
-    
-    protected void addFeatures(Accumulator acc,
-        LabelSubstitutionLabelSmoother labelSubstitutionLabelSmoother,
-        List<String> ruleSourceNonterminals, List<String> substitutionNonterminals, Rule rule,
-        List<HGNode> tailNodes) {
-      addBasicFeatures(acc, labelSubstitutionLabelSmoother, ruleSourceNonterminals,
-          substitutionNonterminals);
-      addSparseFeature(acc, labelSubstitutionLabelSmoother, rule, tailNodes);
-    }
-  }
-
   public static abstract class LabelSubstitutionLabelSmoother {
 
     public abstract String getSmoothedLabelString(String originalLabelString);

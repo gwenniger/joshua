@@ -311,7 +311,7 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
               ComputeNodeResult result = new ComputeNodeResult(featureFunctions, bestRule,
                   currentTailNodes, i, j, sourcePath, sentence);
               CubePruneState bestState = new CubePruneState(result, ranks, rules, currentTailNodes,
-                  (DotNode)dotNode);
+                  castOrCreateNewDotNode(dotNode,i, j,unpackedSuperNodeList));
               candidates.add(bestState);
               
             }            

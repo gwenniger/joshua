@@ -591,10 +591,12 @@ public class Decoder {
       
       
       /* Add command-line-passed weights to the weights array for processing below */
-      if (joshuaConfiguration.weight_overwrite != "") {
+      if (!joshuaConfiguration.weight_overwrite.equals("")) {
+        System.err.println("Gideon: joshuaConfiguration.weight_overwrite: \"" + joshuaConfiguration.weight_overwrite + "\"");
         String[] tokens = joshuaConfiguration.weight_overwrite.split("\\s+");
         for (int i = 0; i < tokens.length; i += 2) {
           String feature = tokens[i];
+          System.err.println("Gideon: feature name: " + feature);
           float value = Float.parseFloat(tokens[i+1]);
           
           if (joshuaConfiguration.moses)
@@ -697,6 +699,8 @@ public class Decoder {
       // tm = {thrax/hiero,packed,samt,moses} OWNER LIMIT FILE
       for (String tmLine : joshuaConfiguration.tms) {
 
+        System.err.println("Gideon: tmLine:  " + tmLine);
+        
         String type = tmLine.substring(0,  tmLine.indexOf(' '));
         String[] args = tmLine.substring(tmLine.indexOf(' ')).trim().split("\\s+");
         HashMap<String, String> parsedArgs = FeatureFunction.parseArgs(args);
@@ -718,9 +722,25 @@ public class Decoder {
               System.exit(2);
             }
           } else {
+                 
             // thrax, hiero, samt
-            grammar = new MemoryBasedBatchGrammar(type, path, owner,
-                joshuaConfiguration.default_non_terminal, span_limit, joshuaConfiguration);
+            if(joshuaConfiguration.fuzzy_matching){
+              System.err.println(">>>Gideon: Loading fuzzy matching grammar ... ");
+              // Create a MemoryBasedBatchGrammar with efficient nonterminal lookup. This 
+             // is important to make the fuzzy_matching decoding go fast
+             grammar = new MemoryBasedBatchGrammarEfficientNonterminalLookup(type, path, owner,
+                 joshuaConfiguration.default_non_terminal, span_limit,joshuaConfiguration);
+             System.err.println(">>>Gideon: Loaded ... ");
+             }
+            else{
+              System.err.println(">>>Gideon: Loading  grammar ... ");
+              grammar = new MemoryBasedBatchGrammar(type, path, owner,
+                  joshuaConfiguration.default_non_terminal, span_limit, joshuaConfiguration);
+              System.err.println(">>>Gideon: Loaded ... ");
+            }
+                    
+           
+            
           }
           
         } else {
@@ -730,7 +750,9 @@ public class Decoder {
               : -1;
 
           joshuaConfiguration.search_algorithm = "stack";
+          System.err.println(">>>Gideon: new phrasetable ... ");
           grammar = new PhraseTable(path, owner, type, joshuaConfiguration, maxSourceLen);
+          
         }
 
         this.grammars.add(grammar);
@@ -739,6 +761,7 @@ public class Decoder {
       checkSharedVocabularyChecksumsForPackedGrammars(packed_grammars);
 
     } else {
+      System.err.println(">>>Gideon: warning - no grammars supplied ... ");
       Decoder.LOG(1, "* WARNING: no grammars supplied!  Supplying dummy glue grammar.");
       MemoryBasedBatchGrammar glueGrammar = new MemoryBasedBatchGrammar("glue", joshuaConfiguration);
       glueGrammar.setSpanLimit(-1);
@@ -747,11 +770,13 @@ public class Decoder {
     }
     
     /* Add the grammar for custom entries */
+    System.err.println(">>>Gideon: add customs phrasetable ... ");
     this.customPhraseTable = new PhraseTable(null, "custom", "phrase", joshuaConfiguration, 0);
     this.grammars.add(this.customPhraseTable);
     
     /* Create an epsilon-deleting grammar */
     if (joshuaConfiguration.lattice_decoding) {
+      System.err.println(">>>Gideon:creating epsilon deleting grammar ... ");
       Decoder.LOG(1, "Creating an epsilon-deleting grammar");
       MemoryBasedBatchGrammar latticeGrammar = new MemoryBasedBatchGrammar("lattice", joshuaConfiguration);
       latticeGrammar.setSpanLimit(-1);
@@ -771,20 +796,7 @@ public class Decoder {
     }
 
 //<<<<<<< HEAD
-/*
- //TODO Fixme    
-         else if(joshuaConfiguration.fuzzy_matching){
-          // Create a MemoryBasedBatchGrammar with efficient nonterminal lookup. This 
-          // is important to make the fuzzy_matching decoding go fast
-          grammar = new MemoryBasedBatchGrammarEfficientNonterminalLookup(format, file, owner,
-              joshuaConfiguration.default_non_terminal, span_limit,joshuaConfiguration);
-          }
-          else if (format.equals("thrax") || format.equals("regexp")) {
-          grammar = new MemoryBasedBatchGrammar(format, file, owner,
-              joshuaConfiguration.default_non_terminal, span_limit,joshuaConfiguration);
-        }
-        this.grammarFactories.add(grammar);
-*/        
+        
 //=======
     /* Now create a feature function for each owner */
     HashSet<String> ownersSeen = new HashSet<String>();
