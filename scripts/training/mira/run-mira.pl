@@ -168,6 +168,9 @@ my $___DEV_SYMAL = undef;
 my $dev_symal_abs = undef;
 my $working_dir_abs = undef;
 
+# This flag is added to the Joshua decoder command to deal with feature names in a way compatible with the moses tuner scripts
+my $RUN_JOSHUA_IN_MOSES_COMPATIBLE_MODE_FLAG = "-moses true";
+
 use Getopt::Long;
 GetOptions(
   "working-dir=s" => \$___WORKING_DIR,
@@ -1312,10 +1315,11 @@ sub run_decoder {
     $decoder_cmd .= " 2> $___WORKING_DIR/run$run.log";
 
     ##<Gideon Inserted new decoder command>
+    ### Notice that rather than putting it in the configuration file, we added here $RUN_JOSHUA_IN_MOSES_COMPATIBLE_MODE_FLAG (-moses true) to make the Joshua decoder run in "moses mode"
     my $get_dev_cmd;
     my $nbest_list_cmd = "-n-best-list $filename $___N_BEST_LIST_SIZE distinct";
     $get_dev_cmd = "cat $___DEV_F";
-    $decoder_cmd = "$get_dev_cmd | $___DECODER $___DECODER_FLAGS -config $___CONFIG $decoder_config $nbest_list_cmd -top-n $___N_BEST_LIST_SIZE 2> run$run.log | $JOSHUA/scripts/training/mira/feature_label_munger.pl | tee $filename | $JOSHUA/bin/extract-1best > run$run.out";
+    $decoder_cmd = "$get_dev_cmd | $___DECODER $___DECODER_FLAGS -config $___CONFIG $decoder_config $RUN_JOSHUA_IN_MOSES_COMPATIBLE_MODE_FLAG  $nbest_list_cmd -top-n $___N_BEST_LIST_SIZE 2> run$run.log | $JOSHUA/scripts/training/mira/feature_label_munger.pl | tee $filename | $JOSHUA/bin/extract-1best > run$run.out";
     #$get_dev_cmd = "cat $___DEV_F";
     #$decoder_cmd = "$get_dev_cmd | $___DECODER $___DECODER_FLAGS -config $___CONFIG $decoder_config $nbest_list_cmd -top-n $___N_BEST_LIST_SIZE 2> run$run.log | tee $filename | $JOSHUA/bin/extract-1best > #run$run.out";      
     ##</Gideon Inserted new decoder command>  
@@ -1391,7 +1395,8 @@ sub get_featlist_from_moses {
     print STDERR "Using cached features list: $featlistfn\n";
   } else {
     print STDERR "Asking moses for feature names and values from $___CONFIG\n";
-    my $cmd = "$___DECODER $___DECODER_FLAGS -config $configfn";
+     ### Notice that rather than putting it in the configuration file, we added here $RUN_JOSHUA_IN_MOSES_COMPATIBLE_MODE_FLAG (-moses true) to make the Joshua decoder run in "moses mode"
+    my $cmd = "$___DECODER $___DECODER_FLAGS $RUN_JOSHUA_IN_MOSES_COMPATIBLE_MODE_FLAG -config $configfn";
     $cmd .= " -inputtype $___INPUTTYPE" if defined($___INPUTTYPE);
     $cmd .= " -show-weights > $featlistfn";
     print STDERR "ExecutingBLADIE: $cmd\n";
