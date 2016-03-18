@@ -439,10 +439,13 @@ public class Decoder {
          */
         String text;
         if (joshuaConfiguration.moses) {
+          
           text = translation.toString().replaceAll("=", "= ");
           // Write the complete formatted string to STDOUT
-          if (joshuaConfiguration.n_best_file != null)
+          if (joshuaConfiguration.n_best_file != null){                   
             out.write(text.getBytes());
+          }
+          
           
           // Extract just the translation and output that to STDOUT
           text = text.substring(0,  text.indexOf('\n'));
@@ -566,8 +569,12 @@ public class Decoder {
    */
   private String mosesize(String feature) {
     if (joshuaConfiguration.moses) {
-      if (feature.startsWith("tm_") || feature.startsWith("lm_"))
+      if (feature.startsWith("tm_") || feature.startsWith("lm_")){
         return feature.replace("_", "-");
+      } 
+      if(feature.equals("OOVPenalty")){
+        return "OOV_Penalty";
+      }
     }
     
     return feature;
@@ -592,11 +599,9 @@ public class Decoder {
       
       /* Add command-line-passed weights to the weights array for processing below */
       if (!joshuaConfiguration.weight_overwrite.equals("")) {
-        System.err.println("Gideon: joshuaConfiguration.weight_overwrite: \"" + joshuaConfiguration.weight_overwrite + "\"");
         String[] tokens = joshuaConfiguration.weight_overwrite.split("\\s+");
         for (int i = 0; i < tokens.length; i += 2) {
           String feature = tokens[i];
-          System.err.println("Gideon: feature name: " + feature);
           float value = Float.parseFloat(tokens[i+1]);
           
           if (joshuaConfiguration.moses)
@@ -646,11 +651,13 @@ public class Decoder {
       if (joshuaConfiguration.show_weights_and_quit) {
         for (int i = 0; i < FeatureVector.DENSE_FEATURE_NAMES.size(); i++) {
           String name = FeatureVector.DENSE_FEATURE_NAMES.get(i);
-          if (joshuaConfiguration.moses) 
-            System.out.println(String.format("%s= %.5f", mosesize(name), weights.getDense(i)));
-          else
+          if (joshuaConfiguration.moses) {
+              System.out.println(String.format("%s= %.5f", mosesize(name), weights.getDense(i)));
+          }  
+          else{
             System.out.println(String.format("%s %.5f", name, weights.getDense(i)));
-        }
+          }
+        }       
         System.exit(0);
       }
       
@@ -961,14 +968,6 @@ public class Decoder {
         } catch (ClassNotFoundException e2) {
           // do nothing
         }
-
-      
- //     else if(LabelSubstitutionFFAndFFPredictionCreater.isRelevantFeatureName(feature)){
-  //      this.featureFunctions.add(LabelSubstitutionFFAndFFPredictionCreater.createLabelSubstitutionFFForFeatureName(feature, weights, joshuaConfiguration));
-  //      logger.info("Creating feature score predictor");
-  //      joshuaConfiguration.featureScorePredictor = LabelSubstitutionFFAndFFPredictionCreater.createLightWeightLabelSubstitutionFeatureScorePredictorForFeatureName(feature, weights, joshuaConfiguration);
-   //     logger.info("Created feature score predictor" + joshuaConfiguration.featureScorePredictor);
-      
       
       }
     }

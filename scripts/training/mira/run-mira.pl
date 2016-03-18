@@ -792,9 +792,9 @@ while (1) {
 
   # skip running the decoder if the user wanted
   if (! $skip_decoder) {
-    print "($run) run decoder to produce n-best lists\n";
+    print "($run) run decoder to produce n-best lists\n";    
     ($nbest_file, $lsamp_file, $hypergraph_dir) = run_decoder($featlist, $run, $need_to_normalize);
-
+    
     $need_to_normalize = 0;
     if ($___LATTICE_SAMPLES) {
       my $combined_file = "$nbest_file.comb";
@@ -1311,7 +1311,15 @@ sub run_decoder {
     }
     $decoder_cmd .= " 2> $___WORKING_DIR/run$run.log";
 
-    print STDERR "Executing: $decoder_cmd \n";
+    ##<Gideon Inserted new decoder command>
+    my $get_dev_cmd;
+    my $nbest_list_cmd = "-n-best-list $filename $___N_BEST_LIST_SIZE distinct";
+    $get_dev_cmd = "cat $___DEV_F";
+    $decoder_cmd = "$get_dev_cmd | $___DECODER $___DECODER_FLAGS -config $___CONFIG $decoder_config $nbest_list_cmd -top-n $___N_BEST_LIST_SIZE 2> run$run.log | $JOSHUA/scripts/training/mira/feature_label_munger.pl | tee $filename | $JOSHUA/bin/extract-1best > run$run.out";
+    #$get_dev_cmd = "cat $___DEV_F";
+    #$decoder_cmd = "$get_dev_cmd | $___DECODER $___DECODER_FLAGS -config $___CONFIG $decoder_config $nbest_list_cmd -top-n $___N_BEST_LIST_SIZE 2> run$run.log | tee $filename | $JOSHUA/bin/extract-1best > #run$run.out";      
+    ##</Gideon Inserted new decoder command>  
+    print STDERR "Executing-Decoder: $decoder_cmd \n";
     safesystem($decoder_cmd) or die "The decoder died. CONFIG WAS $decoder_config \n";
 
     if (!$___HG_MIRA) {
@@ -1369,6 +1377,7 @@ sub sanity_check_order_of_lambdas {
 
   my @expected_lambdas = @{$featlist->{"names"}};
   my @got = get_order_of_scores_from_nbestlist($filename_or_stream);
+  push @got, "OOV_Penalty";  ### Gideon add OOV_Penalty which is recognized as sparse feature and not returned by @got but included in @expected_lambdas
   die "Mismatched lambdas. Decoder returned @got, we expected @expected_lambdas"
     if "@got" ne "@expected_lambdas";
 }
@@ -1385,7 +1394,7 @@ sub get_featlist_from_moses {
     my $cmd = "$___DECODER $___DECODER_FLAGS -config $configfn";
     $cmd .= " -inputtype $___INPUTTYPE" if defined($___INPUTTYPE);
     $cmd .= " -show-weights > $featlistfn";
-    print STDERR "Executing: $cmd\n";
+    print STDERR "ExecutingBLADIE: $cmd\n";
     safesystem($cmd) or die "Failed to run moses with the config $configfn";
   }
   return get_featlist_from_file($featlistfn);
