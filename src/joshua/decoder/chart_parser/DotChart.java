@@ -473,8 +473,8 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
 
 
     protected  DotNodeBase(int i, int j, Trie trieNode, SourcePath srcPath) {
-      i = this.i;
-      j = this.j;
+      this.i = i;
+      this.j = j;
       this.trieNode = trieNode;
       this.srcPath = srcPath;
     }
