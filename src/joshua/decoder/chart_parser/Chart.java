@@ -292,55 +292,16 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
               //Assert.assertEquals(superNodes.size(),unpackedSuperNodeList.size());
               //addNewCubePruneState(i, j, rules, dotNode, bestRule,unpackedSuperNodeList, arity, sourcePath, candidates, visitedStates);
               
-              List<HGNode> currentTailNodes = new ArrayList<HGNode>();
-        
-              for (SuperNode si : unpackedSuperNodeList) {
-                currentTailNodes.add(si.nodes.get(0));
-              }
-    
-              /*
-               * `ranks` records the current position in the cube. the 0th index is
-               * the rule, and the remaining indices 1..N correspond to the tail
-               * nodes (= nonterminals in the rule). These tail nodes are
-               * represented by SuperNodes, which group together items with the same
-               * nonterminal but different DP state (e.g., language model state)
-               */
-              int[] ranks = new int[1 + superNodes.size()];
-              Arrays.fill(ranks, 1);
-    
-              ComputeNodeResult result = new ComputeNodeResult(featureFunctions, bestRule,
-                  currentTailNodes, i, j, sourcePath, sentence);
-              CubePruneState bestState = new CubePruneState(result, ranks, rules, currentTailNodes,
-                  castOrCreateNewDotNode(dotNode,i, j,unpackedSuperNodeList));
-              candidates.add(bestState);
-              
+              addNewCandidate(i,j,candidates, rules, bestRule, sourcePath, dotNode, unpackedSuperNodeList);          
             }            
             
           }
           else{
           
-            List<HGNode> currentTailNodes = new ArrayList<HGNode>();
             @SuppressWarnings("unchecked")
-            List<SuperNode> superNodes = (List<SuperNode>) dotNode.getAntSuperNodes(); 
-            for (SuperNode si : superNodes) {
-              currentTailNodes.add(si.nodes.get(0));
-            }
-  
-            /*
-             * `ranks` records the current position in the cube. the 0th index is
-             * the rule, and the remaining indices 1..N correspond to the tail
-             * nodes (= nonterminals in the rule). These tail nodes are
-             * represented by SuperNodes, which group together items with the same
-             * nonterminal but different DP state (e.g., language model state)
-             */
-            int[] ranks = new int[1 + superNodes.size()];
-            Arrays.fill(ranks, 1);
-  
-            ComputeNodeResult result = new ComputeNodeResult(featureFunctions, bestRule,
-                currentTailNodes, i, j, sourcePath, sentence);
-            CubePruneState bestState = new CubePruneState(result, ranks, rules, currentTailNodes,
-                (DotNode)dotNode);
-            candidates.add(bestState);
+            List<SuperNode> superNodes = (List<SuperNode>) dotNode.getAntSuperNodes();
+            
+            addNewCandidate(i,j,candidates, rules, bestRule, sourcePath, dotNode, superNodes);
         }
         }
       }
@@ -349,6 +310,33 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
     applyCubePruning(i, j, candidates);
   }
 
+  
+  private void addNewCandidate(int i, int j, PriorityQueue<CubePruneState> candidates,
+      List<Rule> rules,Rule bestRule,SourcePath sourcePath,T dotNode,List<SuperNode> superNodes){
+    List<HGNode> currentTailNodes = new ArrayList<HGNode>();
+     
+    for (SuperNode si : superNodes) {
+      currentTailNodes.add(si.nodes.get(0));
+    }
+
+    /*
+     * `ranks` records the current position in the cube. the 0th index is
+     * the rule, and the remaining indices 1..N correspond to the tail
+     * nodes (= nonterminals in the rule). These tail nodes are
+     * represented by SuperNodes, which group together items with the same
+     * nonterminal but different DP state (e.g., language model state)
+     */
+    int[] ranks = new int[1 + superNodes.size()];
+    Arrays.fill(ranks, 1);
+
+    ComputeNodeResult result = new ComputeNodeResult(featureFunctions, bestRule,
+        currentTailNodes, i, j, sourcePath, sentence);
+    CubePruneState bestState = new CubePruneState(result, ranks, rules, currentTailNodes,
+        castOrCreateNewDotNode(dotNode,i, j,superNodes));
+    candidates.add(bestState);
+  }
+  
+  
   /**
    * Applies cube pruning over a span.
    * 
