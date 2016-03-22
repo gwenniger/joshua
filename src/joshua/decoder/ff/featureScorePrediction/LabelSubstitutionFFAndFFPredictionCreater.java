@@ -1,8 +1,11 @@
 package joshua.decoder.ff.featureScorePrediction;
 
+import java.util.List;
+
 import joshua.decoder.JoshuaConfiguration;
 import joshua.decoder.ff.FeatureVector;
 import joshua.decoder.ff.LabelSubstitutionFF;
+import joshua.decoder.ff.LabelSubstitutionSparseFF;
 
 public class LabelSubstitutionFFAndFFPredictionCreater {
 
@@ -19,23 +22,13 @@ public class LabelSubstitutionFFAndFFPredictionCreater {
         LabelSubstitutionFF.getFeatureNameStandardSparseFeature());
   }
 
-  public static boolean isBasicDoubleLabelFeatureName(String featureName) {
-    return stringsEqualIgnoreCase(featureName,
-        LabelSubstitutionFF.getFeatureNameDoubleLabelFeature());
-  }
-
-  public static boolean isSparseDoubleLabelFeatureName(String featureName) {
-    return stringsEqualIgnoreCase(featureName,
-        LabelSubstitutionFF.getFeatureNameDoubleLabelSparseFeature());
-  }
-
-  public static boolean isRelevantFeatureName(String featureName) {
+  
+  public static boolean isLabelSubstitutionFeature(String featureName){
     return isBasicLabelSubsituttionFeatureName(featureName)
-        || isSparseLabelSubstitutionFeatureName(featureName)
-        || isBasicDoubleLabelFeatureName(featureName)
-        || isSparseDoubleLabelFeatureName(featureName);
+        || isSparseLabelSubstitutionFeatureName(featureName);
   }
-
+  
+  /*
   public static LabelSubstitutionFF createLabelSubstitutionFFForFeatureName(String featureName,
       FeatureVector weights, JoshuaConfiguration joshuaConfiguration) {
     if (isBasicLabelSubsituttionFeatureName(featureName)) {
@@ -51,33 +44,52 @@ public class LabelSubstitutionFFAndFFPredictionCreater {
     } else {
       throw new RuntimeException("Error: unrecognized label substitution feature name");
     }
-  }
+  }*/
 
-  private static FeatureScorePredictor createHeavyWeightLabelSubstitutionFeatureScorePredictorForFeatureName(
-      String featureName, FeatureVector weights, JoshuaConfiguration joshuaConfiguration) {
-    if (isBasicLabelSubsituttionFeatureName(featureName)) {
+  private static FeatureScorePredictor createBasicHeavyWeightLabelSubstitutionFeatureScorePredictorForFeatureName(
+      String featureName,List<String> args, FeatureVector weights, JoshuaConfiguration joshuaConfiguration){
+    if(LabelSubstitutionFF.hasDoubleLabelArgument(args)){
+      return DoubleLabeledRulesLSFScorePredictor.createDoubleLabeledRulesLSFScorePredictor(
+          LabelSubstitutionFF.getFeatureNameStandardFeature(), weights); 
+    }  
+    else{  
       return BasicLabelSubstitutionFeatureScorePredictor
           .createBasicLabelSubstitutionFeatureScorePredictorStandAlone(
               LabelSubstitutionFF.getFeatureNameStandardFeature(), weights);
-    } else if (isSparseLabelSubstitutionFeatureName(featureName)) {
+    }
+  }
+
+  private static FeatureScorePredictor createSparseHeavyWeightLabelSubstitutionFeatureScorePredictorForFeatureName(
+      String featureName,List<String> args, FeatureVector weights, JoshuaConfiguration joshuaConfiguration){
+    if(LabelSubstitutionFF.hasDoubleLabelArgument(args)){
+      return DoubleLabeledRulesLSFScorePredictor.createDoubleLabeledRulesLSFScorePredictor(
+          LabelSubstitutionFF.getFeatureNameStandardSparseFeature(), weights);
+    }  
+    else{        
       return SparseLabelSubstitutionFeatureScorePredictor
           .createSparseLabelSubstitutionFeatureScorePredictorStandAlone(
               LabelSubstitutionFF.getFeatureNameStandardSparseFeature(), weights);
-    } else if (isBasicDoubleLabelFeatureName(featureName)) {
-      return DoubleLabeledRulesLSFScorePredictor.createDoubleLabeledRulesLSFScorePredictor(
-          LabelSubstitutionFF.getFeatureNameDoubleLabelFeature(), weights);
-    } else if (isSparseDoubleLabelFeatureName(featureName)) {
-      return DoubleLabeledRulesLSFScorePredictor.createDoubleLabeledRulesLSFScorePredictor(
-          LabelSubstitutionFF.getFeatureNameDoubleLabelSparseFeature(), weights);
-    } else {
+    }
+  }
+  
+  
+  private static FeatureScorePredictor createHeavyWeightLabelSubstitutionFeatureScorePredictorForFeatureName(
+      String featureName,List<String> args, FeatureVector weights, JoshuaConfiguration joshuaConfiguration) {
+    if (isBasicLabelSubsituttionFeatureName(featureName)) {
+      return createBasicHeavyWeightLabelSubstitutionFeatureScorePredictorForFeatureName(featureName, args, weights, joshuaConfiguration);
+    } else if (isSparseLabelSubstitutionFeatureName(featureName)) {
+      return createSparseHeavyWeightLabelSubstitutionFeatureScorePredictorForFeatureName(featureName, args, weights, joshuaConfiguration);
+    }  else {
       throw new RuntimeException("Error: unrecognized label substitution feature name");
     }
   }
 
-  public static FeatureScorePredictor createLightWeightLabelSubstitutionFeatureScorePredictorForFeatureName(
-      String featureName, FeatureVector weights, JoshuaConfiguration joshuaConfiguration) {
+  public static FeatureScorePredictor createLightWeightLabelSubstitutionFeatureScorePredictorForFeatureName(          
+      String featureName, List<String> args, FeatureVector weights, JoshuaConfiguration joshuaConfiguration) {
+    System.err.println("createLightWeightLabelSubstitutionFeatureScorePredictorForFeatureName - args: "+ args);
     FeatureScorePredictor heavyWeightPredictor = createHeavyWeightLabelSubstitutionFeatureScorePredictorForFeatureName(
-        featureName, weights, joshuaConfiguration);
+        featureName,args, weights, joshuaConfiguration);
+    System.err.println("heavyWeightPredictor: " + heavyWeightPredictor);
     return LabelSubstitutionFeatureScorePredictionMaxScoresOnly
         .createLabelSubstitutionFeatureScorePredictionMaxScoresOnly(heavyWeightPredictor);
   }

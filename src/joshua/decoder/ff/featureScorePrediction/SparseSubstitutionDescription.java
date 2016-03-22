@@ -30,12 +30,11 @@ public class SparseSubstitutionDescription {
   protected static SparseSubstitutionDescription creatSparseSubstitutionDescription(
       String featureTypePrefix, String sparseFeatureString) {
 
-    System.err.println("sparse feature String: " + sparseFeatureString);
+    //System.err.println("sparse feature String: " + sparseFeatureString);
 
-    String featureSubstring = sparseFeatureString.substring(sparseFeatureString
-        .indexOf(featureTypePrefix) + featureTypePrefix.length());
-
-    System.err.println("feature substring: " + featureSubstring);
+    //String featureSubstring = sparseFeatureString.substring(sparseFeatureString
+     //   .indexOf(featureTypePrefix) + featureTypePrefix.length());
+    //System.err.println("feature substring: " + featureSubstring);
 
     boolean ruleIsInverted = LabelSubstitutionFF
         .geRuleOrientationIsInvertedFromSparseFeatureString(sparseFeatureString);

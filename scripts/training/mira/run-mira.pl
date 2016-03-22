@@ -781,6 +781,7 @@ while (1) {
   #  create_config($___CONFIG, "./run$run.moses.ini", $featlist, $run, (defined $devbleu ? $devbleu : "--not-estimated--"), $sparse_weights_file);
   create_config_joshua($___CONFIG, "./run$run.joshua.config", $featlist, $run, (defined $devbleu ? $devbleu : "--not-estimated--"), $sparse_weights_file);
 
+
   # Save dense weights to simplify best dev recovery
   {
     my $densefile = "run$run.dense";
@@ -1319,7 +1320,8 @@ sub run_decoder {
     my $get_dev_cmd;
     my $nbest_list_cmd = "-n-best-list $filename $___N_BEST_LIST_SIZE distinct";
     $get_dev_cmd = "cat $___DEV_F";
-    $decoder_cmd = "$get_dev_cmd | $___DECODER $___DECODER_FLAGS -config $___CONFIG $decoder_config $RUN_JOSHUA_IN_MOSES_COMPATIBLE_MODE_FLAG  $nbest_list_cmd -top-n $___N_BEST_LIST_SIZE 2> run$run.log | $JOSHUA/scripts/training/mira/feature_label_munger.pl | tee $filename | $JOSHUA/bin/extract-1best > run$run.out";
+    ## Note that we use the updated  ./run$run.joshua.config instead of the static  $___CONFIG in which sparse weights do not get updated
+    $decoder_cmd = "$get_dev_cmd | $___DECODER $___DECODER_FLAGS -config ./run$run.joshua.config $decoder_config $RUN_JOSHUA_IN_MOSES_COMPATIBLE_MODE_FLAG  $nbest_list_cmd -top-n $___N_BEST_LIST_SIZE 2> run$run.log | $JOSHUA/scripts/training/mira/feature_label_munger.pl | tee $filename | $JOSHUA/bin/extract-1best > run$run.out";
     #$get_dev_cmd = "cat $___DEV_F";
     #$decoder_cmd = "$get_dev_cmd | $___DECODER $___DECODER_FLAGS -config $___CONFIG $decoder_config $nbest_list_cmd -top-n $___N_BEST_LIST_SIZE 2> run$run.log | tee $filename | $JOSHUA/bin/extract-1best > #run$run.out";      
     ##</Gideon Inserted new decoder command>  

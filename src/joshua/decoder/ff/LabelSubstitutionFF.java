@@ -21,8 +21,7 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
   private static final String BASIC_FEATURE_SUBSTITUTES_INFIX = "_substitutes_";
   private static final String STANDARD_LABEL_SUBSTITUTION_BASIC_FEATURE_FUNCTION_NAME = "LabelSubstitution";
   private static final String STANDARD_LABEL_SUBSTITUTION_SPARSE_FEATURE_FUNCTION_NAME = "LabelSubstitutionSparse";
-  private static final String DOUBLE_LABEL_SMOOTHED_LABEL_SUBSTITUTION_BASIC_FEATURE_FUNCTION_NAME = "LabelSubstitutionDoubleLabel";
-  private static final String DOUBLE_LABEL_SMOOTHED_LABEL_SUBSTITUTION_SPARSE_FEATURE_FUNCTION_NAME = "LabelSubstitutionDoubleLabelSparse";
+  private static final String DOUBLE_LABEL_ARGUMENT = "DoubleLabel";
 //=======
 //public class LabelSubstitutionFF extends StatelessFF {
 //>>>>>>> 090cb8c5287c85bec08ba4b48c16088e2b9a8449
@@ -50,7 +49,7 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
   public LabelSubstitutionFF(FeatureVector weights, String[] args, JoshuaConfiguration config) {
     super(weights, "LabelSubstitution", args, config);
     this.joshuaConfiguration = config;
-    this.labelSmoothersList = createNoSmoothingLabelSubstiontionSmoothersList();
+    this.labelSmoothersList = createLabelSmoothersList(args);
     if(this.labelSmoothersList == null){
       throw new RuntimeException("Error: label smoothers list is null");
     }
@@ -59,9 +58,25 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
   protected LabelSubstitutionFF(FeatureVector weights, String[] args, JoshuaConfiguration config, String featureName) {
     super(weights, featureName, args, config);
     this.joshuaConfiguration = config;
-    this.labelSmoothersList = createNoSmoothingLabelSubstiontionSmoothersList();
+    this.labelSmoothersList = createLabelSmoothersList(args);
   }
   
+  
+  protected static List<LabelSubstitutionLabelSmoother> createLabelSmoothersList(String[] args){
+    if(hasDoubleLabelArgument(Arrays.asList(args))){
+        return  createDoubleLabelSmoothingLabelSubstiontionSmoothersList();
+    }
+    else{
+      return createNoSmoothingLabelSubstiontionSmoothersList();
+    }
+  }
+  
+  public static boolean hasDoubleLabelArgument(List<String> args){
+    if((args.size() > 0) && (args.get(0).equals(DOUBLE_LABEL_ARGUMENT))){
+      return true;
+    }
+    return false;
+  }
   
   public static LabelSubstitutionBasicFF createStandardLabelSubstitutionFF(FeatureVector weights,
       JoshuaConfiguration joshuaConfiguration) {
@@ -77,13 +92,13 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
 
   public static LabelSubstitutionBasicFF createLabelSubstitutionFFDoubleLabel(
       FeatureVector weights, JoshuaConfiguration joshuaConfiguration) {
-    return new LabelSubstitutionBasicFF(weights, getFeatureNameDoubleLabelFeature(),
+    return new LabelSubstitutionBasicFF(weights, getFeatureNameStandardFeature(),
         joshuaConfiguration, createDoubleLabelSmoothingLabelSubstiontionSmoothersList());
   }
 
   public static LabelSubstitutionSparseFF createLabelSubstitutionFFDoubleLabelSparse(
       FeatureVector weights, JoshuaConfiguration joshuaConfiguration) {
-    return new LabelSubstitutionSparseFF(weights, getFeatureNameDoubleLabelSparseFeature(),
+    return new LabelSubstitutionSparseFF(weights, getFeatureNameStandardSparseFeature(),
         joshuaConfiguration, createDoubleLabelSmoothingLabelSubstiontionSmoothersList());
   }
 
@@ -93,14 +108,6 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
 
   public static String getFeatureNameStandardSparseFeature() {
     return STANDARD_LABEL_SUBSTITUTION_SPARSE_FEATURE_FUNCTION_NAME;
-  }
-
-  public static String getFeatureNameDoubleLabelFeature() {
-    return DOUBLE_LABEL_SMOOTHED_LABEL_SUBSTITUTION_BASIC_FEATURE_FUNCTION_NAME;
-  }
-
-  public static String getFeatureNameDoubleLabelSparseFeature() {
-    return DOUBLE_LABEL_SMOOTHED_LABEL_SUBSTITUTION_SPARSE_FEATURE_FUNCTION_NAME;
   }
 
   public static List<String> getLabelParts(String originalLabelString) {

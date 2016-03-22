@@ -7,6 +7,7 @@ import java.io.OutputStream;
 import java.io.FileNotFoundException;
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -20,6 +21,7 @@ import joshua.decoder.JoshuaConfiguration.INPUT_TYPE;
 import joshua.decoder.JoshuaConfiguration.SERVER_TYPE;
 import joshua.decoder.ff.FeatureFunction;
 import joshua.decoder.ff.PhraseModel;
+import joshua.decoder.ff.featureScorePrediction.LabelSubstitutionFFAndFFPredictionCreater;
 import joshua.decoder.ff.tm.Grammar;
 import joshua.decoder.ff.tm.Rule;
 import joshua.decoder.ff.tm.Trie;
@@ -646,6 +648,13 @@ public class Decoder {
 
       // Initialize the features: requires that LM model has been initialized.
       this.initializeFeatureFunctions();
+      
+      // If fuzzy matching is used we compute the label substitution feature weight predictor,
+      // to be able to speed up fuzzy matching decoding
+      if(joshuaConfiguration.fuzzy_matching){
+        this.determineLabelSubstitutionFeatureValuePredictor();  
+      }
+      
 
       // This is mostly for compatibility with the Moses tuning script
       if (joshuaConfiguration.show_weights_and_quit) {
@@ -982,4 +991,34 @@ public class Decoder {
     if (VERBOSE(i))
       System.err.println(msg);
   }
+  
+  private void determineLabelSubstitutionFeatureValuePredictor(){ 
+
+    for (String featureLine : joshuaConfiguration.features) {
+      // feature-function = NAME args
+      // 1. create new class named NAME, pass it config, weights, and the args
+
+      // Get rid of the leading crap.
+      featureLine = featureLine.replaceFirst("^feature_function\\s*=\\s*", "");
+
+      String fields[] = featureLine.split("\\s+");
+      String featureName = fields[0];
+      determineLabelSubstitutionFeatureValuePredictorForFeatureName(featureName, Arrays.asList(fields));
+     
+    }
+  }
+  
+  private void determineLabelSubstitutionFeatureValuePredictorForFeatureName(String featureName,
+      List<String> args){
+    if(LabelSubstitutionFFAndFFPredictionCreater.isLabelSubstitutionFeature(featureName)){
+      if(this.joshuaConfiguration.featureScorePredictor != null){       
+        throw new RuntimeException("Error: feature score predictor already computed, should be computed only once");
+      }
+      this.joshuaConfiguration.featureScorePredictor = LabelSubstitutionFFAndFFPredictionCreater.createLightWeightLabelSubstitutionFeatureScorePredictorForFeatureName(featureName, 
+          args, weights, joshuaConfiguration);
+      System.err.println("Gideon: Computed feature score predictor: " + this.joshuaConfiguration.featureScorePredictor);
+      
+    }
+  }
+  
 }

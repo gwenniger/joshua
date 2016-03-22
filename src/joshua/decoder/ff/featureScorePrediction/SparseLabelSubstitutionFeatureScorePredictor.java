@@ -40,6 +40,7 @@ public class SparseLabelSubstitutionFeatureScorePredictor implements FeatureScor
 
   public static SparseLabelSubstitutionFeatureScorePredictor createSparseLabelSubstitutionFeatureScorePredictorStandAlone(
       String labelSubstitutionRootTypeName, FeatureVector featureVector) {
+    System.err.println(">>> createSparseLabelSubstitutionFeatureScorePredictorStandAlone");
     String featureTypePrefix = LabelSubstitutionFF.getFeatureNamesPrefix(
         labelSubstitutionRootTypeName, new LabelSubstitutionFF.NoSmoothingLabelSubstitutionLabelSmoother());
     return createSparseLabelSubstitutionFeatureScorePredictor(featureTypePrefix, featureVector);
@@ -47,8 +48,8 @@ public class SparseLabelSubstitutionFeatureScorePredictor implements FeatureScor
   
   private static Map<SparseSubstitutionDescription, Float> computeSubstitutionPairToScoreMap(
       String featureTypePrefix, FeatureVector featureVector) {
-    Map<SparseSubstitutionDescription, Float> result = new HashMap<SparseSubstitutionDescription, Float>();
-
+    Map<SparseSubstitutionDescription, Float> result = new HashMap<SparseSubstitutionDescription, Float>();   
+    
     for (String featureString : featureVector.keySet()) {
       if (isRelevantFeature(featureTypePrefix, featureString)) {
         SparseSubstitutionDescription substitutionPair = SparseSubstitutionDescription
@@ -135,4 +136,14 @@ public class SparseLabelSubstitutionFeatureScorePredictor implements FeatureScor
     return featureTypePrefix;
   }
 
+  public String toString(){
+    String result = "<SparseLabelSubstitutionFeatureScorePredictor>";
+    result += "\nSparse features:\n";
+    for(SparseSubstitutionDescription sparseSubstitutionDescription: sparseSubstitutionDescriptionToScoreMap.keySet()){
+      result += "\n" + sparseSubstitutionDescription;
+    }
+    result += "\n</SparseLabelSubstitutionFeatureScorePredictor>";
+    return result;
+  }
+  
 }
