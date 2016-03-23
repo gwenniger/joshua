@@ -1,7 +1,7 @@
 package joshua.decoder.ff.featureScorePrediction;
 
 import joshua.decoder.ff.FeatureVector;
-import joshua.decoder.ff.LabelSubstitutionFF;
+import joshua.decoder.ff.LabelSubstitutionFeatureStrings;
 import joshua.decoder.ff.featureScorePrediction.BasicLabelSubstitutionFeatureScorePredictor.SubstitutionPair;
 
 public class LabelMatchingFeatureScorePredictor  {
@@ -24,11 +24,11 @@ public class LabelMatchingFeatureScorePredictor  {
   }
 
   private static String getMatchFeatureString(String featureTypePrefix) {
-    return featureTypePrefix + LabelSubstitutionFF.getMatchFeatureSuffix();
+    return featureTypePrefix + LabelSubstitutionFeatureStrings.getMatchFeatureSuffix();
   }
 
   private static String getNoMatchFeatureString(String featureTypePrefix) {
-    return featureTypePrefix + LabelSubstitutionFF.getNoMatchFeatureSuffix();
+    return featureTypePrefix + LabelSubstitutionFeatureStrings.getNoMatchFeatureSuffix();
   }
 
   private static float getMatchScore(String featureTypePrefix, FeatureVector featureVector) {

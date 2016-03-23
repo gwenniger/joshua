@@ -8,6 +8,7 @@ import org.junit.Assert;
 import joshua.decoder.ff.FeatureVector;
 import joshua.decoder.ff.LabelSubstitutionFF;
 import joshua.decoder.ff.LabelSubstitutionFF.LabelSubstitutionLabelSmoother;
+import joshua.decoder.ff.LabelSubstitutionFeatureStrings;
 
 
 public class BasicLabelSubstitutionFeatureScorePredictor implements FeatureScorePredictor {
@@ -63,7 +64,7 @@ public class BasicLabelSubstitutionFeatureScorePredictor implements FeatureScore
 
   private static boolean isRelevantFeature(String featureTypePrefix, String featureString) {
     if (featureString.startsWith(featureTypePrefix)) {
-      return LabelSubstitutionFF.isBasicLabelSubstitutionFeatureString(featureString);
+      return LabelSubstitutionFeatureStrings.isBasicLabelSubstitutionFeatureString(featureString);
     }
     return false;
   }
@@ -71,7 +72,7 @@ public class BasicLabelSubstitutionFeatureScorePredictor implements FeatureScore
   private static SubstitutionPair getSubstitutionPair(String featureTypePrefix, String featureString) {
     String featureSubstring = featureString.substring(featureString.indexOf(featureTypePrefix)
         + featureTypePrefix.length());
-    String[] parts = featureSubstring.split(LabelSubstitutionFF
+    String[] parts = featureSubstring.split(LabelSubstitutionFeatureStrings
         .getBasicLabelSubstitutionFeatureSubstitutionInfix());
     Assert.assertEquals(2, parts.length);
     return new SubstitutionPair(parts[1], parts[0]);

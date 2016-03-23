@@ -7,7 +7,7 @@ import java.util.Map;
 
 import joshua.decoder.ff.FeatureVector;
 import joshua.decoder.ff.LabelSubstitutionFF;
-import joshua.decoder.ff.LabelSubstitutionFF.LabelSubstitutionLabelSmoother;
+import joshua.decoder.ff.LabelSubstitutionFeatureStrings;
 
 public class SparseLabelSubstitutionFeatureScorePredictor implements FeatureScorePredictor {
   private final BasicLabelSubstitutionFeatureScorePredictor basicLabelSubstitutionFeatureScorePredictor;
@@ -30,14 +30,6 @@ public class SparseLabelSubstitutionFeatureScorePredictor implements FeatureScor
         computeSubstitutionPairToScoreMap(featureTypePrefix, featureVector));
   }
   
-  public static SparseLabelSubstitutionFeatureScorePredictor createSparseLabelSubstitutionFeatureScorePredictor(
-      String labelSubstitutionRootTypeName,
-      LabelSubstitutionLabelSmoother labelSubstitutionLabelSmoother, FeatureVector featureVector) {
-    String featureTypePrefix = LabelSubstitutionFF.getFeatureNamesPrefix(
-        labelSubstitutionRootTypeName, labelSubstitutionLabelSmoother);
-    return createSparseLabelSubstitutionFeatureScorePredictor(featureTypePrefix, featureVector);
-  }
-
   public static SparseLabelSubstitutionFeatureScorePredictor createSparseLabelSubstitutionFeatureScorePredictorStandAlone(
       String labelSubstitutionRootTypeName, FeatureVector featureVector) {
     System.err.println(">>> createSparseLabelSubstitutionFeatureScorePredictorStandAlone");
@@ -63,7 +55,7 @@ public class SparseLabelSubstitutionFeatureScorePredictor implements FeatureScor
 
   private static boolean isRelevantFeature(String featureTypePrefix, String featureString) {
     if (featureString.startsWith(featureTypePrefix)) {
-      return LabelSubstitutionFF.isSparseLabelSubstitutionFeatureString(featureString);
+      return LabelSubstitutionFeatureStrings.isSparseLabelSubstitutionFeatureString(featureString);
     }
     return false;
   }
@@ -140,7 +132,8 @@ public class SparseLabelSubstitutionFeatureScorePredictor implements FeatureScor
     String result = "<SparseLabelSubstitutionFeatureScorePredictor>";
     result += "\nSparse features:\n";
     for(SparseSubstitutionDescription sparseSubstitutionDescription: sparseSubstitutionDescriptionToScoreMap.keySet()){
-      result += "\n" + sparseSubstitutionDescription;
+      float weight = sparseSubstitutionDescriptionToScoreMap.get(sparseSubstitutionDescription);
+      result += "\n" + sparseSubstitutionDescription.getFeatureString(featureTypePrefix) + " weight: " + weight;
     }
     result += "\n</SparseLabelSubstitutionFeatureScorePredictor>";
     return result;

@@ -5,7 +5,6 @@ import java.util.List;
 import joshua.decoder.JoshuaConfiguration;
 import joshua.decoder.ff.FeatureVector;
 import joshua.decoder.ff.LabelSubstitutionFF;
-import joshua.decoder.ff.LabelSubstitutionSparseFF;
 
 public class LabelSubstitutionFFAndFFPredictionCreater {
 

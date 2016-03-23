@@ -2,13 +2,10 @@ package joshua.decoder.ff.featureScorePrediction;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import org.w3c.dom.ls.LSSerializerFilter;
-
-import joshua.decoder.ff.LabelSubstitutionFF;
 import joshua.decoder.ff.LabelSubstitutionFF.FirstSublabelOnlyLabelSubstitutionLabelSmoother;
 import joshua.decoder.ff.LabelSubstitutionFF.LastSublabelOnlyLabelSubstitutionLabelSmoother;
 import joshua.decoder.ff.LabelSubstitutionFF.LabelSubstitutionLabelSmoother;
+import joshua.decoder.ff.LabelSubstitutionFeatureStrings;
 import joshua.decoder.ff.featureScorePrediction.BasicLabelSubstitutionFeatureScorePredictor.SubstitutionPair;
 import junit.framework.Assert;
 
@@ -30,19 +27,19 @@ public class SparseSubstitutionDescription {
   protected static SparseSubstitutionDescription creatSparseSubstitutionDescription(
       String featureTypePrefix, String sparseFeatureString) {
 
-    //System.err.println("sparse feature String: " + sparseFeatureString);
+    // System.err.println("sparse feature String: " + sparseFeatureString);
 
-    //String featureSubstring = sparseFeatureString.substring(sparseFeatureString
-     //   .indexOf(featureTypePrefix) + featureTypePrefix.length());
-    //System.err.println("feature substring: " + featureSubstring);
+    // String featureSubstring = sparseFeatureString.substring(sparseFeatureString
+    // .indexOf(featureTypePrefix) + featureTypePrefix.length());
+    // System.err.println("feature substring: " + featureSubstring);
 
-    boolean ruleIsInverted = LabelSubstitutionFF
+    boolean ruleIsInverted = LabelSubstitutionFeatureStrings
         .geRuleOrientationIsInvertedFromSparseFeatureString(sparseFeatureString);
-    String ruleLeftHandSideLabel = LabelSubstitutionFF
+    String ruleLeftHandSideLabel = LabelSubstitutionFeatureStrings
         .getLeftHandSideFromSparseFeatureString(sparseFeatureString);
-    List<String> ruleNonterminalLabels = LabelSubstitutionFF
+    List<String> ruleNonterminalLabels = LabelSubstitutionFeatureStrings
         .geRuleNonterminalsFromSparseFeatureString(sparseFeatureString);
-    List<String> substitutedToLabels = LabelSubstitutionFF
+    List<String> substitutedToLabels = LabelSubstitutionFeatureStrings
         .geRuleSubstitutedToLabelsFromSparseFeatureString(sparseFeatureString);
 
     // substitutedToLabels
@@ -52,8 +49,9 @@ public class SparseSubstitutionDescription {
   }
 
   /**
-   * Compute the label smoothed version of a list of labels, typically selecting only
-   * the first or second half of a double label 
+   * Compute the label smoothed version of a list of labels, typically selecting only the first or
+   * second half of a double label
+   * 
    * @param labelSubstitutionLabelSmoother
    * @param unsmoothedLabels
    * @return
@@ -122,6 +120,12 @@ public class SparseSubstitutionDescription {
 
   public boolean isBinaryRule() {
     return (this.ruleNonterminalLabels.size() == 2);
+  }
+
+  public String getFeatureString(String featureNamePrefix) {
+    return LabelSubstitutionFeatureStrings.getGapLabelsForRuleIdenitySubstitutionFeature(
+        featureNamePrefix, leftHandSideLabel, ruleNonterminalLabels, substitutedToLabels,
+        ruleIsInverted);
   }
 
 }
