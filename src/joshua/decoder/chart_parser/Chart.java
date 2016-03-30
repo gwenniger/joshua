@@ -13,7 +13,7 @@ import org.junit.Assert;
 import joshua.corpus.Vocabulary;
 import joshua.decoder.Decoder;
 import joshua.decoder.JoshuaConfiguration;
-import joshua.decoder.chart_parser.CubePruneState;
+import joshua.decoder.chart_parser.CubePruneStateBase;
 import joshua.decoder.chart_parser.DotChart.DotNode;
 import joshua.decoder.chart_parser.DotChart.DotNodeMultiLabel;
 import joshua.decoder.ff.FeatureFunction;
@@ -203,7 +203,7 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
   private void completeSpan(int i, int j) {
 
     /* STEP 1: create the heap, and seed it with all of the candidate states */
-    PriorityQueue<CubePruneState> candidates = new PriorityQueue<CubePruneState>();
+    PriorityQueue<CubePruneStateBase<T>> candidates = new PriorityQueue<CubePruneStateBase<T>>();
 
     /*
      * Look at all the grammars, seeding the chart with completed rules from the
@@ -271,7 +271,7 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
             Assert.assertFalse(superNodes.isEmpty());
             //logger.info("superNodes.get(0).size();" +superNodes.get(0).size()); 
             
-            List<SuperNode> firstLabelCombination = unpackFirstCombination(superNodes);
+            //List<SuperNode> firstLabelCombination = unpackFirstCombination(superNodes);
             //TODO
             // 1: Compute the feature weight for the first label combination
             // 2. Compute the maximum possible feature weight across labeled variants
@@ -284,24 +284,25 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
             //    so we can safely discard the whole set to save considerable computation.
             
             
-            List<List<SuperNode>>   unpackedSuperNodeLists =  unpackAllPossibleTCombinations(superNodes);
-            Assert.assertFalse(unpackedSuperNodeLists.isEmpty());
+            //List<List<SuperNode>>   unpackedSuperNodeLists =  unpackAllPossibleTCombinations(superNodes);
+            //Assert.assertFalse(unpackedSuperNodeLists.isEmpty());
             
             //logger.info(" Looping over unpackedSuperNodeList");
-            for(List<SuperNode> unpackedSuperNodeList : unpackedSuperNodeLists){                                                   
+            //for(List<SuperNode> unpackedSuperNodeList : unpackedSuperNodeLists){                                                   
               //Assert.assertEquals(superNodes.size(),unpackedSuperNodeList.size());
               //addNewCubePruneState(i, j, rules, dotNode, bestRule,unpackedSuperNodeList, arity, sourcePath, candidates, visitedStates);
               
-              addNewCandidate(i,j,candidates, rules, bestRule, sourcePath, dotNode, unpackedSuperNodeList);          
-            }            
-            
+              //addNewCandidate(i,j,candidates, rules, bestRule, sourcePath, dotNode, unpackedSuperNodeList);          
+            //}            
+              addNewCandidate(i,j,candidates, rules, bestRule, sourcePath, dotNode);
           }
           else{
           
             @SuppressWarnings("unchecked")
             List<SuperNode> superNodes = (List<SuperNode>) dotNode.getAntSuperNodes();
             
-            addNewCandidate(i,j,candidates, rules, bestRule, sourcePath, dotNode, superNodes);
+            //addNewCandidate(i,j,candidates, rules, bestRule, sourcePath, dotNode, superNodes);
+            addNewCandidate(i,j,candidates, rules, bestRule, sourcePath, dotNode);
         }
         }
       }
@@ -311,14 +312,46 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
   }
 
   
-  private void addNewCandidate(int i, int j, PriorityQueue<CubePruneState> candidates,
-      List<Rule> rules,Rule bestRule,SourcePath sourcePath,T dotNode,List<SuperNode> superNodes){
+  /**
+   *  Get the current tail nodes for a dotNode, depending on whether we are doing fuzzy 
+   *  matching or not. 
+   * @param dotNode
+   * @return
+   */
+  private  List<HGNode> getCurrentTailNodesForDotNode(T dotNode){
     List<HGNode> currentTailNodes = new ArrayList<HGNode>();
-     
-    for (SuperNode si : superNodes) {
-      currentTailNodes.add(si.nodes.get(0));
+    
+    if(peformFuzzyMatching()){
+      DotNodeMultiLabel dotNodeMultiLabel = (DotNodeMultiLabel) dotNode;
+      for (List<SuperNode> superNodeAlternatives : dotNodeMultiLabel.getAntSuperNodes()) {
+        SuperNode firstAlternative = superNodeAlternatives.get(0);
+        // Obtain the indices of the cell from which the first node (and other node) originate
+        int i = firstAlternative.nodes.get(0).i;
+        int j = firstAlternative.nodes.get(0).j;
+        Cell cell = getCell(i, j);
+        List<HGNode> sortedNodes = cell.getSortedNodes();        
+        currentTailNodes.add(sortedNodes.get(0));
+      }
+    }    
+    else{
+      DotNode dotNodeCasted = (DotNode) dotNode;      
+      for (SuperNode si : dotNodeCasted.getAntSuperNodes()) {
+        currentTailNodes.add(si.nodes.get(0));
+      }
     }
+    
+    return currentTailNodes;
+    
+  }
+  
+  @SuppressWarnings("unchecked")
+  private void addNewCandidate(int i, int j, PriorityQueue<CubePruneStateBase<T>> candidates,
+      List<Rule> rules,Rule bestRule,SourcePath sourcePath,T dotNode){
+    List<HGNode> currentTailNodes = getCurrentTailNodesForDotNode(dotNode);
 
+    System.err.println("Gideon: addNewCandidate");
+    
+    
     /*
      * `ranks` records the current position in the cube. the 0th index is
      * the rule, and the remaining indices 1..N correspond to the tail
@@ -326,13 +359,24 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
      * represented by SuperNodes, which group together items with the same
      * nonterminal but different DP state (e.g., language model state)
      */
-    int[] ranks = new int[1 + superNodes.size()];
+    int[] ranks = new int[1 + currentTailNodes.size()];
     Arrays.fill(ranks, 1);
 
     ComputeNodeResult result = new ComputeNodeResult(featureFunctions, bestRule,
         currentTailNodes, i, j, sourcePath, sentence);
-    CubePruneState bestState = new CubePruneState(result, ranks, rules, currentTailNodes,
-        castOrCreateNewDotNode(dotNode,i, j,superNodes));
+    CubePruneStateBase<T> bestState = null; 
+        
+    if(peformFuzzyMatching()){
+      bestState = (CubePruneStateBase<T>) 
+          new CubePruneStateFuzzyMatching(result, ranks, rules, currentTailNodes,
+          (DotNodeMultiLabel)dotNode);
+    }
+    else{
+      bestState = (CubePruneStateBase<T>) 
+          new CubePruneState(result, ranks, rules, currentTailNodes,
+          (DotNode)dotNode);
+    }               
+        
     candidates.add(bestState);
   }
   
@@ -345,7 +389,8 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
    * @param stateConstraint
    * @param candidates
    */
-  private void applyCubePruning(int i, int j, PriorityQueue<CubePruneState> candidates) {
+  @SuppressWarnings("unchecked")
+  private void applyCubePruning(int i, int j, PriorityQueue<CubePruneStateBase<T>> candidates) {
 
     // System.err.println(String.format("CUBEPRUNE: %d-%d with %d candidates",
     // i, j, candidates.size()));
@@ -357,17 +402,17 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
      * There are multiple ways to reach each point in the cube, so short-circuit
      * that.
      */
-    HashSet<CubePruneState> visitedStates = new HashSet<CubePruneState>();
+    HashSet<CubePruneStateBase<T>> visitedStates = new HashSet<CubePruneStateBase<T>>();
 
     int popLimit = config.pop_limit;
     int popCount = 0;
     while (candidates.size() > 0 && ((++popCount <= popLimit) || popLimit == 0)) {
-      CubePruneState state = candidates.poll();
+      CubePruneStateBase<T> state = candidates.poll();
 
-      DotNode dotNode = state.getDotNode();
+      T dotNode = state.getDotNode();
       List<Rule> rules = state.rules;
       SourcePath sourcePath = dotNode.getSourcePath();
-      List<SuperNode> superNodes = dotNode.getAntSuperNodes();
+      //List<SuperNode> superNodes = dotNode.getAntSuperNodes();
 
       /*
        * Add the hypothesis to the chart. This can only happen if (a) we're not
@@ -398,21 +443,51 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
         if (k == 0
             && (nextRanks[k] > rules.size() || (config.num_translation_options > 0 && nextRanks[k] > config.num_translation_options)))
           continue;
-        else if ((k != 0 && nextRanks[k] > superNodes.get(k - 1).nodes.size()))
+//        else if ((k != 0 && nextRanks[k] > superNodes.get(k - 1).nodes.size()))
+         // Use the CubePruneState method getSizeAlternativesListNonterminal to get the size for this dimension
+         else if ((k != 0 && nextRanks[k] > state.getAlternativesListNonterminal(k-1, this).size()))
           continue;
 
+        System.err.println("}}}Gideon: nextRanks (before)[" + (k) +"] : " + nextRanks[k]);
+        
         /* Use the updated ranks to assign the next rule and tail node. */
         Rule nextRule = rules.get(nextRanks[0] - 1);
         // HGNode[] nextAntNodes = new HGNode[state.antNodes.size()];
         List<HGNode> nextAntNodes = new ArrayList<HGNode>();
-        for (int x = 0; x < state.ranks.length - 1; x++)
-          nextAntNodes.add(superNodes.get(x).nodes.get(nextRanks[x + 1] - 1));
+        boolean foundValidNextAntNode = false;
+        for (int x = 0; x < state.ranks.length - 1; x++){
+          //nextAntNodes.add(superNodes.get(x).nodes.get(nextRanks[x + 1] - 1));          
+          HGNode nextAntNode = findNextValidAntNode(state, nextRanks, x);
+          
+          if(nextAntNode != null){
+            nextAntNodes.add(nextAntNode);
+            foundValidNextAntNode = true;
+            System.err.println(">>Gideon: foundNextValidAntNode");
+          }
+          else {
+            foundValidNextAntNode = false;
+            System.err.println(">>Gideon: failed foundNextValidAntNode");
+            break;            
+          }
+        
+        }
+        if(!foundValidNextAntNode)
+          continue;
 
         /* Create the next state. */
-        CubePruneState nextState = new CubePruneState(new ComputeNodeResult(featureFunctions,
-            nextRule, nextAntNodes, i, j, sourcePath, this.sentence), nextRanks, rules,
-            nextAntNodes, dotNode);
-
+        CubePruneStateBase<T> nextState = null;
+        if(peformFuzzyMatching()){
+          nextState = (CubePruneStateBase<T>) new CubePruneStateFuzzyMatching(new ComputeNodeResult(featureFunctions,
+              nextRule, nextAntNodes, i, j, sourcePath, this.sentence), nextRanks, rules,
+              nextAntNodes, (DotNodeMultiLabel)dotNode);
+        }
+        else{
+          nextState = (CubePruneStateBase<T>) new CubePruneState(new ComputeNodeResult(featureFunctions,
+              nextRule, nextAntNodes, i, j, sourcePath, this.sentence), nextRanks, rules,
+              nextAntNodes, (DotNode)dotNode);
+        }
+        
+        
         /* Skip states that have been explored before. */
         if (visitedStates.contains(nextState))
           continue;
@@ -423,6 +498,28 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
     }
   }
   
+  private HGNode findNextValidAntNode(CubePruneStateBase<T> state,int[] nextRanks, int nonterminalIndex){
+    //nextAntNodes.add(superNodes.get(x).nodes.get(nextRanks[x + 1] - 1));
+    List<Integer> acceptableLabelIndices = state.getAcceptableLabelIndicesNonterminal(nonterminalIndex);
+    System.err.println("Gideon: acceptableLabelIndices: " + acceptableLabelIndices);
+    
+    int numAlternatives = state.getAlternativesListNonterminal(nonterminalIndex, this).size();
+    System.err.println("Gideon: numAlternatives: " + numAlternatives);
+    System.err.println("Gideon: nextRanks[" + (nonterminalIndex + 1) +"] : " + nextRanks[nonterminalIndex+1]);
+    
+    while( nextRanks[nonterminalIndex+1] <= numAlternatives){
+      HGNode node = state.getAlternativesListNonterminal(nonterminalIndex, this).get(nextRanks[nonterminalIndex + 1] - 1);
+      System.err.println("Gideon: node.lhs: " + node.lhs);
+      if(acceptableLabelIndices.contains(node.lhs)){
+        return node;
+      }else{
+        nextRanks[nonterminalIndex+1]++;
+      }              
+    }
+    return null;
+  }
+  
+  /*
   private DotNode castOrCreateNewDotNode(T dotNode,int i, int j,List<SuperNode> superNodes){
     if(peformFuzzyMatching()){
         DotNodeMultiLabel castDotNodeMultiLabel = (DotNodeMultiLabel) dotNode;
@@ -432,7 +529,7 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
     else{
       return (DotNode) dotNode;
     }
-  }
+  }*/
   
   private boolean peformFuzzyMatching(){
     return this.dotcharts[0].performFuzzyMatching();
@@ -479,7 +576,7 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
     }
   
   /* Create a priority queue of candidates for each span under consideration */
-  private PriorityQueue<CubePruneState>[] allCandidates;
+  private PriorityQueue<CubePruneStateBase<T>>[] allCandidates;
 
   private ArrayList<SuperNode> nodeStack;
 
@@ -494,7 +591,7 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
     for (i = sourceLength - 1; i >= 0; i--) {
       allCandidates = new PriorityQueue[sourceLength - i + 2];
       for (int id = 0; id < allCandidates.length; id++)
-        allCandidates[id] = new PriorityQueue<CubePruneState>();
+        allCandidates[id] = new PriorityQueue<CubePruneStateBase<T>>();
 
       nodeStack = new ArrayList<SuperNode>();
 
@@ -523,7 +620,7 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
         }
 
         // Now that we've accumulated all the candidates, apply cube pruning
-        applyCubePruning(i, j, allCandidates[j - i]);
+        applyCubePruning(i, j, (allCandidates[j - i]));
 
         // Add unary nodes
         addUnaryNodes(this.grammars, i, j);
@@ -631,6 +728,7 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
    * @param rules
    * @param tailNodes
    */
+  @SuppressWarnings("unchecked")
   private void addToCandidates(DotNode dotNode) {
     // System.err.println(String.format("ADD TO CANDIDATES %s AT INDEX %d",
     // dotNode, dotNode.end() - dotNode.begin()));
@@ -652,7 +750,7 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
         dotNode.begin(), dotNode.end(), dotNode.getSourcePath(), sentence);
     CubePruneState seedState = new CubePruneState(result, ranks, rules, tailNodes, dotNode);
 
-    allCandidates[dotNode.end() - dotNode.begin()].add(seedState);
+    allCandidates[dotNode.end() - dotNode.begin()].add((CubePruneStateBase<T>) seedState);
   }
 
   

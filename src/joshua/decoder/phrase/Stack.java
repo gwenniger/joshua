@@ -108,7 +108,7 @@ public class Stack extends ArrayList<Hypothesis> {
   /**
    * Receives a partially-initialized translation candidate and places it on the
    * priority queue after scoring it with all of the feature functions. In this
-   * respect it is like {@link CubePruneState} (it could make use of that class with
+   * respect it is like {@link CubePruneStateBase} (it could make use of that class with
    * a little generalization of spans / coverage).
    * 
    * This function is also used to (fairly concisely) implement constrained decoding. Before
