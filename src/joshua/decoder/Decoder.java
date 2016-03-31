@@ -651,9 +651,9 @@ public class Decoder {
       
       // If fuzzy matching is used we compute the label substitution feature weight predictor,
       // to be able to speed up fuzzy matching decoding
-      if(joshuaConfiguration.fuzzy_matching){
-        this.determineLabelSubstitutionFeatureValuePredictor();  
-      }
+      //if(joshuaConfiguration.fuzzy_matching){
+      //  this.determineLabelSubstitutionFeatureValuePredictor();  
+      //}
       
 
       // This is mostly for compatibility with the Moses tuning script

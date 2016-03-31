@@ -2,8 +2,6 @@ package joshua.decoder.chart_parser;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import joshua.decoder.ff.tm.Rule;
 import joshua.decoder.hypergraph.HGNode;
 
 public class NextAntNodesPreparer {
@@ -33,9 +31,9 @@ public class NextAntNodesPreparer {
 
       if (nextAntNode != null) {
         nextAntNodes.add(nextAntNode);
-        System.err.println(">>Gideon: foundNextValidAntNode");
+        //System.err.println(">>Gideon: foundNextValidAntNode");
       } else {
-        System.err.println(">>Gideon: failed foundNextValidAntNode");
+        //System.err.println(">>Gideon: failed foundNextValidAntNode");
         return null;
       }
     }

@@ -343,9 +343,7 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
   private void addNewCandidate(int i, int j, PriorityQueue<CubePruneStateBase<T>> candidates,
       List<Rule> rules,Rule bestRule,SourcePath sourcePath,T dotNode){
   
-
-    System.err.println("Gideon: addNewCandidate");
-    
+    //System.err.println("Gideon: addNewCandidate");    
     
     /*
      * `ranks` records the current position in the cube. the 0th index is
@@ -445,9 +443,7 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
 //        else if ((k != 0 && nextRanks[k] > superNodes.get(k - 1).nodes.size()))
          // Use the CubePruneState method getSizeAlternativesListNonterminal to get the size for this dimension
          else if ((k != 0 && nextRanks[k] > state.getAlternativesListNonterminal(k-1, this).size()))
-          continue;
-
-        System.err.println("}}}Gideon: nextRanks (before)[" + (k) +"] : " + nextRanks[k]);
+          continue;      
         
         /* Use the updated ranks to assign the next rule and tail node. */
         Rule nextRule = rules.get(nextRanks[0] - 1);
