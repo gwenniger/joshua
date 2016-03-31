@@ -18,14 +18,17 @@ public abstract class CubePruneStateBase<T extends joshua.decoder.chart_parser.D
   List<Rule> rules;
   protected T dotNode;
   //private DotNode dotNode;
+  protected final ValidAntNodeComputer<T> validAntNodeComputer;
 
-  public CubePruneStateBase(ComputeNodeResult score, int[] ranks, List<Rule> rules, List<HGNode> antecedents, T dotNode) {
+  public CubePruneStateBase(ComputeNodeResult score, int[] ranks, List<Rule> rules, List<HGNode> antecedents, T dotNode,
+      ValidAntNodeComputer<T> validAntNodeComputer) {
     this.computeNodeResult = score;
     this.ranks = ranks;
     this.rules = rules;
     // create a new vector is critical, because currentAntecedents will change later
     this.antNodes = new ArrayList<HGNode>(antecedents);
     this.dotNode = dotNode;
+    this.validAntNodeComputer = validAntNodeComputer;
   }
 
   /**
@@ -98,8 +101,20 @@ public abstract class CubePruneStateBase<T extends joshua.decoder.chart_parser.D
   }
   
  
-  public abstract List<HGNode> getAlternativesListNonterminal(int nonterminalIndex, Chart<?,?> chart);
+  public  List<HGNode> getAlternativesListNonterminal(int nonterminalIndex, Chart<?,?> chart){
+    return validAntNodeComputer.getAlternativesListNonterminal(nonterminalIndex, chart);
+  }
   
-  public abstract List<Integer> getAcceptableLabelIndicesNonterminal(int nonterminalIndex);
+  public  List<Integer> getAcceptableLabelIndicesNonterminal(int nonterminalIndex){
+    return validAntNodeComputer.getAcceptableLabelIndicesNonterminal(nonterminalIndex);
+  }
+  
+  public HGNode findNextValidAntNodeAndUpdateRanks(int[] nextRanks, int nonterminalIndex, Chart<?,?> chart){
+    return validAntNodeComputer.findNextValidAntNodeAndUpdateRanks(nextRanks, nonterminalIndex, chart);
+  }
+  
+  public ValidAntNodeComputer<T> getValidAntNodeComputer(){
+    return this.validAntNodeComputer;
+  }
   
 }

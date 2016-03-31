@@ -481,7 +481,7 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
 
     
     /* A list of grounded (over a span) nonterminals that have been crossed in traversing the rule */
-    private ArrayList<SuperNode> antSuperNodes = null;
+    protected List<T> antSuperNodes = null;
         
 
     @Override
@@ -557,10 +557,7 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
    * A DotNode represents the partial application of a rule rooted to a particular span (i,j). It
    * maintains a pointer to the trie node in the grammar for efficient mapping.
    */
-  static class DotNode extends DotNodeBase<SuperNode>{
-  
-    private List<SuperNode> antSuperNodes = null; // pointer to SuperNode in Chart
-    
+  static class DotNode extends DotNodeBase<SuperNode>{  
     
     /**
      * Initialize a dot node with the span, grammar trie node, list of supernode tail pointers, and
@@ -580,9 +577,7 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
     @Override
     public List<SuperNode> getAntSuperNodes() {
         return antSuperNodes;
-    }
-    
-  
+    }      
   }
   
   /**
@@ -591,16 +586,15 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
    * except for their labels
    */
   static class DotNodeMultiLabel extends DotNodeBase<List<SuperNode>>{    
-    private List<List<SuperNode>> antSuperNodeLists = null; 
     
     public DotNodeMultiLabel(int i, int j, Trie trieNode, List<List<SuperNode>> antSuperNodeLists, SourcePath srcPath) {
       super(i,j,trieNode,srcPath);
-      this.antSuperNodeLists = antSuperNodeLists;
+      this.antSuperNodes = antSuperNodeLists;
     }
 
     @Override
     public List<List<SuperNode>> getAntSuperNodes() {
-      return antSuperNodeLists;
+      return antSuperNodes;
     }
     
   }

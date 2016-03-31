@@ -11,17 +11,7 @@ public class CubePruneState extends CubePruneStateBase<DotNode>{
 
   public CubePruneState(ComputeNodeResult score, int[] ranks, List<Rule> rules,
       List<HGNode> antecedents, DotNode dotNode) {
-    super(score, ranks, rules, antecedents, dotNode);
-  }
-
-  @Override
-  public List<HGNode>  getAlternativesListNonterminal(int nonterminalIndex,Chart<?,?> chart){
-    return dotNode.getAntSuperNodes().get(nonterminalIndex).nodes;    
-  }
-
-  @Override
-  public List<Integer> getAcceptableLabelIndicesNonterminal(int nonterminalIndex) {
-    return Collections.singletonList(this.dotNode.getAntSuperNodes().get(nonterminalIndex).lhs);
+    super(score, ranks, rules, antecedents, dotNode, ValidAntNodeComputer.createValidAntNodeComputerBasic(dotNode));
   }
 
 }
