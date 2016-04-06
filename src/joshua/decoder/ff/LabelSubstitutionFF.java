@@ -13,7 +13,7 @@ import joshua.decoder.ff.tm.Rule;
 import joshua.decoder.hypergraph.HGNode;
 import joshua.decoder.segment_file.Sentence;
 
-public abstract class LabelSubstitutionFF extends StatelessFF {
+public class LabelSubstitutionFF extends StatelessFF {
   private static final String STANDARD_LABEL_SUBSTITUTION_BASIC_FEATURE_FUNCTION_NAME = "LabelSubstitution";
   private static final String STANDARD_LABEL_SUBSTITUTION_SPARSE_FEATURE_FUNCTION_NAME = "LabelSubstitutionSparse";
   private static final String DOUBLE_LABEL_ARGUMENT = "DoubleLabel";
@@ -256,10 +256,22 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
             labelSubstitutionLabelSmoother), 1);
   }
 
-  protected abstract void addFeatures(Accumulator acc,
+  /**
+   * This method add the features to the accumulator, and is overwritten in LabelSubstitutionSparseFF
+   * @param acc
+   * @param labelSubstitutionLabelSmoother
+   * @param ruleSourceNonterminals
+   * @param substitutionNonterminals
+   * @param rule
+   * @param tailNodes
+   */
+  protected void addFeatures(Accumulator acc,
       LabelSubstitutionLabelSmoother labelSubstitutionLabelSmoother,
       List<String> ruleSourceNonterminals, List<String> substitutionNonterminals, Rule rule,
-      List<HGNode> tailNodes);
+      List<HGNode> tailNodes){
+    addBasicFeatures(acc, labelSubstitutionLabelSmoother, ruleSourceNonterminals,
+        substitutionNonterminals);
+  }
 
   @Override
   public DPState compute(Rule rule, List<HGNode> tailNodes, int i, int j, SourcePath sourcePath,

@@ -19,6 +19,7 @@ public  class LabelSubstitutionSparseFF extends LabelSubstitutionFF {
         this.labelSmoothersList = labelSmoothersList;
   }
   
+  @Override
   protected void addFeatures(Accumulator acc,
       LabelSubstitutionLabelSmoother labelSubstitutionLabelSmoother,
       List<String> ruleSourceNonterminals, List<String> substitutionNonterminals, Rule rule,
