@@ -41,7 +41,7 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
   
   
   protected static List<LabelSubstitutionLabelSmoother> createLabelSmoothersList(String[] args){
-    if(hasDoubleLabelArgument(Arrays.asList(args))){
+    if(hasDoubleLabelArgument(Arrays.asList(args))){        
         return  createDoubleLabelSmoothingLabelSubstiontionSmoothersList();
     }
     else{
@@ -50,7 +50,8 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
   }
   
   public static boolean hasDoubleLabelArgument(List<String> args){
-    if((args.size() > 0) && (args.get(0).equals(DOUBLE_LABEL_ARGUMENT))){
+    // The first argument args[0] is the name of the feature itself
+    if((args.size() > 1) && (args.get(1).equals(DOUBLE_LABEL_ARGUMENT))){
       return true;
     }
     return false;
@@ -145,6 +146,11 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
     return result;
   }
 
+  private static String  getLabelSmoothedLHS(Rule rule,
+      LabelSubstitutionLabelSmoother labelSubstitutionLabelSmoother){
+    return labelSubstitutionLabelSmoother.getSmoothedLabelString(RulePropertiesQuerying.getLHSAsString(rule)); 
+  }
+  
   private static List<String>  getLabelSmoothedSourceNonterminalsg(Rule rule,
       LabelSubstitutionLabelSmoother labelSubstitutionLabelSmoother){
     List<String> ruleSourceNonterminals = RulePropertiesQuerying
@@ -167,7 +173,8 @@ public abstract class LabelSubstitutionFF extends StatelessFF {
   public final String getGapLabelsForRuleIdenitySubstitutionFeature(Rule rule,
       List<HGNode> tailNodes, LabelSubstitutionLabelSmoother labelSubstitutionLabelSmoother) {
     return LabelSubstitutionFeatureStrings.getGapLabelsForRuleIdenitySubstitutionFeature(
-        getFeatureNamePrefix(labelSubstitutionLabelSmoother),  RulePropertiesQuerying.getLHSAsString(rule), 
+        getFeatureNamePrefix(labelSubstitutionLabelSmoother),  
+        getLabelSmoothedLHS(rule, labelSubstitutionLabelSmoother), 
         getLabelSmoothedSourceNonterminalsg(rule, labelSubstitutionLabelSmoother), 
         getSmoothedSubstitutionLabelsList(tailNodes, labelSubstitutionLabelSmoother),
         rule.isInverting());
