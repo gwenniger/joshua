@@ -47,7 +47,7 @@ public class LabelSubstitutionFFAndFFPredictionCreater {
 
   private static FeatureScorePredictor createBasicHeavyWeightLabelSubstitutionFeatureScorePredictorForFeatureName(
       String featureName,List<String> args, FeatureVector weights, JoshuaConfiguration joshuaConfiguration){
-    if(LabelSubstitutionFF.hasDoubleLabelArgument(args)){
+    if(LabelSubstitutionFF.hasDoubleLabelWithLabelSplittingSmoothingArgument(args)){
       return DoubleLabeledRulesLSFScorePredictor.createDoubleLabeledRulesLSFScorePredictor(
           LabelSubstitutionFF.getFeatureNameStandardFeature(), weights); 
     }  
@@ -60,7 +60,7 @@ public class LabelSubstitutionFFAndFFPredictionCreater {
 
   private static FeatureScorePredictor createSparseHeavyWeightLabelSubstitutionFeatureScorePredictorForFeatureName(
       String featureName,List<String> args, FeatureVector weights, JoshuaConfiguration joshuaConfiguration){
-    if(LabelSubstitutionFF.hasDoubleLabelArgument(args)){
+    if(LabelSubstitutionFF.hasDoubleLabelWithLabelSplittingSmoothingArgument(args)){
       return DoubleLabeledRulesLSFScorePredictor.createDoubleLabeledRulesLSFScorePredictor(
           LabelSubstitutionFF.getFeatureNameStandardSparseFeature(), weights);
     }  

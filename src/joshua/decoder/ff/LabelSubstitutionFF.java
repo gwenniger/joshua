@@ -16,7 +16,7 @@ import joshua.decoder.segment_file.Sentence;
 public class LabelSubstitutionFF extends StatelessFF {
   private static final String STANDARD_LABEL_SUBSTITUTION_BASIC_FEATURE_FUNCTION_NAME = "LabelSubstitution";
   private static final String STANDARD_LABEL_SUBSTITUTION_SPARSE_FEATURE_FUNCTION_NAME = "LabelSubstitutionSparse";
-  private static final String DOUBLE_LABEL_ARGUMENT = "DoubleLabel";
+  private static final String DOUBLE_LABEL_WITH_LABEL_SPLITTING_SMOOTHING_ARGUMENT = "DoubleLabelWithLabelSplittingSmoothing";
   private static final String DOUBLE_LABEL_SEPARATOR = "<<>>";
 
   private static final String FUZZY_MATCHING_GLUE_GRAMMAR_NONTERIMINAL = "[X]";
@@ -41,7 +41,7 @@ public class LabelSubstitutionFF extends StatelessFF {
   
   
   protected static List<LabelSubstitutionLabelSmoother> createLabelSmoothersList(String[] args){
-    if(hasDoubleLabelArgument(Arrays.asList(args))){        
+    if(hasDoubleLabelWithLabelSplittingSmoothingArgument(Arrays.asList(args))){        
         return  createDoubleLabelSmoothingLabelSubstiontionSmoothersList();
     }
     else{
@@ -49,9 +49,9 @@ public class LabelSubstitutionFF extends StatelessFF {
     }
   }
   
-  public static boolean hasDoubleLabelArgument(List<String> args){
+  public static boolean hasDoubleLabelWithLabelSplittingSmoothingArgument(List<String> args){
     // The first argument args[0] is the name of the feature itself
-    if((args.size() > 1) && (args.get(1).equals(DOUBLE_LABEL_ARGUMENT))){
+    if((args.size() > 1) && (args.get(1).equals(DOUBLE_LABEL_WITH_LABEL_SPLITTING_SMOOTHING_ARGUMENT))){
       return true;
     }
     return false;
