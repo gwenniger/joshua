@@ -3,9 +3,6 @@ package joshua.decoder.chart_parser;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-
-import org.testng.Assert;
-
 import joshua.decoder.chart_parser.DotChart.DotNode;
 import joshua.decoder.chart_parser.DotChart.DotNodeBase;
 import joshua.decoder.chart_parser.DotChart.DotNodeMultiLabel;
@@ -77,6 +74,9 @@ public abstract class ValidAntNodeComputer<T extends DotNodeBase<?>> {
     for (int nonterminalIndex = 0; nonterminalIndex < dotNode.getAntSuperNodes().size(); nonterminalIndex++) {
       boolean useFixedRuleMatchingNonterminal = useFixedRuleMatchingNonterminalsFlags
           .get(nonterminalIndex);
+      
+      System.err.println(">>>> createValidAntNodeComputersImprovedCubePruningFuzzyMatching >>>  useFixedRuleMatchingNonterminal: " + useFixedRuleMatchingNonterminal);
+      
       if (useFixedRuleMatchingNonterminal) {
         result.add(ValidAntNodeComputerFuzzyMatchingFixedLabel
             .createValidAntNodeComputerFuzzyMatchingFixedLabel(dotNode, nonterminalIndex, rule));
@@ -168,28 +168,29 @@ public abstract class ValidAntNodeComputer<T extends DotNodeBase<?>> {
 
     public static ValidAntNodeComputerFuzzyMatchingFixedLabel createValidAntNodeComputerFuzzyMatchingFixedLabel(
         DotNodeMultiLabel dotNode, int nonterminalIndex, Rule rule) {
+      System.err.println(">>>>>>>ValidAntNodeComputerFuzzyMatchingFixedLabel.createValidAntNodeComputerFuzzyMatchingFixedLabel called");
       return new ValidAntNodeComputerFuzzyMatchingFixedLabel(dotNode, nonterminalIndex,
           getSuperNodeMatchingRuleGapLabel(rule, dotNode, nonterminalIndex));
     }
 
+
     public static SuperNode getSuperNodeMatchingRuleGapLabel(Rule rule,
         DotNodeMultiLabel dotNodeMultiLabel, int nonterminalIndex) {
       SuperNode result = null;
-      int ruleNonterMinalLabelKey = rule.getForeignNonTerminals()[nonterminalIndex];
       List<SuperNode> superNodeAlternativesList = dotNodeMultiLabel.getAntSuperNodes().get(
           nonterminalIndex);
       for (SuperNode superNodeAlternative : superNodeAlternativesList) {
-        if (superNodeAlternative.lhs == ruleNonterMinalLabelKey) {
+        if (CubePruneStateFuzzyMatching.superNodeMatchesRuleNonterminal(superNodeAlternative, rule, nonterminalIndex)) {
           result = superNodeAlternative;
           return result;
         }
       }
-      Assert.assertNotNull(result);
-      return result;
+      throw new RuntimeException(">>> ValidAntNodeComputer.getSuperNodeMatchingRuleGapLabelResult is null!!!");
     }
 
     @Override
     public List<HGNode> getAlternativesListNonterminal(Chart<?, ?> chart) {
+      System.err.println(">>>>ValidAntNodeComputerFuzzyMatchingFixedLabel.getAlternativesListNonterminal called ");
       return matchingLabelSuperNode.nodes;
     }
 

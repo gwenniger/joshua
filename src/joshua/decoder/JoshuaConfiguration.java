@@ -200,6 +200,15 @@ public class JoshuaConfiguration {
   public boolean fuzzy_matching = false;
 
   public static final String SOFT_SYNTACTIC_CONSTRAINT_DECODING_PROPERTY_NAME = "fuzzy_matching";
+  
+  /*
+   * Whether to use separate cube pruning states for matching substitutions. This is only applicable 
+   * in case fuzzy matching is used. The goal of using these separate states is to increase the 
+   * ability of the search algorithm to explore matching substitutions, without considerably changing the
+   * computational cost of pruning.
+   */
+  public boolean separate_cube_pruning_states_for_matching_substitutions = false;
+  public static final String SEPARATE_CUBE_PRUNING_STATES_MATCHING_SUBSTITUTIONS_PROPERTY_NAME = "separate_cube_pruning_states_for_matching_substitutions";
 
   /***
    * Phrase-based decoding parameters.
@@ -561,9 +570,15 @@ public class JoshuaConfiguration {
           } else if (parameter
               .equals(normalize_key(SOFT_SYNTACTIC_CONSTRAINT_DECODING_PROPERTY_NAME))) {
             fuzzy_matching = Boolean.parseBoolean(fds[1]);
-            logger.finest(String.format(fuzzy_matching + ": %s", fuzzy_matching));
+            logger.finest(String.format(SOFT_SYNTACTIC_CONSTRAINT_DECODING_PROPERTY_NAME + ": %s", fuzzy_matching));
 
-          } else if (parameter.equals(normalize_key("fragment-map"))) {
+          }else if (parameter
+              .equals(normalize_key(SEPARATE_CUBE_PRUNING_STATES_MATCHING_SUBSTITUTIONS_PROPERTY_NAME))) {
+            separate_cube_pruning_states_for_matching_substitutions = Boolean.parseBoolean(fds[1]);
+            logger.finest(String.format(SEPARATE_CUBE_PRUNING_STATES_MATCHING_SUBSTITUTIONS_PROPERTY_NAME + ": %s",  separate_cube_pruning_states_for_matching_substitutions));
+
+          } 
+          else if (parameter.equals(normalize_key("fragment-map"))) {
             fragmentMapFile = fds[1];
             Tree.readMapping(fragmentMapFile);
 

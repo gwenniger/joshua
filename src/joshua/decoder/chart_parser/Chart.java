@@ -296,11 +296,12 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
               
               //addNewCandidate(i,j,candidates, rules, bestRule, sourcePath, dotNode, unpackedSuperNodeList);          
             //}   
-              for(List<Boolean> fixedRuleMatchingNonterminalsFlagsAlternative : CubePruneStateFuzzyMatching.createCubePruningStateCreationFixedRuleMatchingNonterminalsFlagsAlternatives((DotNodeMultiLabel) dotNode, bestRule)){
-                //Assert.assertTrue(fixedRuleMatchingNonterminalsFlagsAlternative.size() > 0);
-                addNewCandidate(i,j,candidates, rules, bestRule, sourcePath, dotNode,fixedRuleMatchingNonterminalsFlagsAlternative);
-              }
-              
+            if(useSeparateCubePruningStatesForMatchingSubstitutions()){
+              addSeparateCandidatesForMatchingAndNonMatchingSubstitutions(arity, j, candidates, rules, bestRule, sourcePath, dotNode);
+            }
+            else{
+              addNewCandidate(i,j,candidates, rules, bestRule, sourcePath, dotNode,null);
+            }              
           }
           else{
           
@@ -317,6 +318,30 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
     applyCubePruning(i, j, candidates);
   }
 
+  /**
+   * Add separate candidates for matching and non-matching substitutions.
+   * The motivation behind this approach is that we want to increase the chance that matching substitutions
+   * are explored during the cube pruning search, by assuring they get added to the initial queue, and 
+   * treating matching substitutions in separate cube pruning states that fix one ore more of the gap labels
+   * and allow only the language model state for the fixed labels to be changed.
+   * 
+   * @param i
+   * @param j
+   * @param candidates
+   * @param rules
+   * @param bestRule
+   * @param sourcePath
+   * @param dotNode
+   */
+  private void addSeparateCandidatesForMatchingAndNonMatchingSubstitutions(int i, int j, PriorityQueue<CubePruneStateBase<T>> candidates,     
+      List<Rule> rules,Rule bestRule,SourcePath sourcePath,T dotNode){
+    System.err.println(">>> addSeparateCandidatesForMatchingAndNonMatchingSubstitutions...");
+    for(List<Boolean> fixedRuleMatchingNonterminalsFlagsAlternative : CubePruneStateFuzzyMatching.createCubePruningStateCreationFixedRuleMatchingNonterminalsFlagsAlternatives((DotNodeMultiLabel) dotNode, bestRule)){
+      //Assert.assertTrue(fixedRuleMatchingNonterminalsFlagsAlternative.size() > 0);
+      addNewCandidate(i,j,candidates, rules, bestRule, sourcePath, dotNode,fixedRuleMatchingNonterminalsFlagsAlternative);
+    }
+  }
+  
   
   /**
    *  Get the current tail nodes for a dotNode, depending on whether we are doing fuzzy 
@@ -328,8 +353,14 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
       int[] ranks, Chart<?, ?> chart,Rule rule, List<Boolean> useFixedRuleMatchingNonterminalsFlags){
     
     if(peformFuzzyMatching()){
-      List<ValidAntNodeComputer<DotNodeMultiLabel>> validAntNodeComputers = ValidAntNodeComputer.createValidAntNodeComputersImprovedCubePruningFuzzyMatching((DotNodeMultiLabel) dotNode, rule,
-          useFixedRuleMatchingNonterminalsFlags);
+      List<ValidAntNodeComputer<DotNodeMultiLabel>> validAntNodeComputers = null;
+      if(useSeparateCubePruningStatesForMatchingSubstitutions()){
+        validAntNodeComputers = ValidAntNodeComputer.createValidAntNodeComputersImprovedCubePruningFuzzyMatching((DotNodeMultiLabel) dotNode, rule,
+            useFixedRuleMatchingNonterminalsFlags);  
+      }else{
+        validAntNodeComputers = ValidAntNodeComputer.createValidAntNodeComputersStandardFuzzyMatching((DotNodeMultiLabel) dotNode);
+      }
+      
       NextAntNodesPreparer<DotNodeMultiLabel> cubePruneStatePreparer = NextAntNodesPreparer.createNextAntNodesPreparer(ranks, validAntNodeComputers, chart);
       return cubePruneStatePreparer.getNextAntNodes();
     }    
@@ -369,10 +400,18 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
     CubePruneStateBase<T> bestState = null; 
         
     if(peformFuzzyMatching()){
-      bestState = (CubePruneStateBase<T>) 
+      if(useSeparateCubePruningStatesForMatchingSubstitutions()){
+            bestState = (CubePruneStateBase<T>) 
+            CubePruneStateFuzzyMatching.createCubePruneStateFuzzyMatchingImprovedCubePruning(result, ranks, rules, currentTailNodes, 
+                (DotNodeMultiLabel) dotNode, bestRule, useFixedRuleMatchingNonterminalsFlags);  
+      }
+      else{        
+          bestState = (CubePruneStateBase<T>) 
           CubePruneStateFuzzyMatching.createCubePruneStateFuzzyMatchingStandard(result, ranks, rules, currentTailNodes,
           (DotNodeMultiLabel)dotNode);
+      }
     }
+    
     else{
       bestState = (CubePruneStateBase<T>) 
           new CubePruneState(result, ranks, rules, currentTailNodes,
@@ -505,6 +544,10 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
   
   private boolean peformFuzzyMatching(){
     return this.dotcharts[0].performFuzzyMatching();
+  }
+  
+  private boolean useSeparateCubePruningStatesForMatchingSubstitutions(){
+    return this.dotcharts[0].useSeparateCubePruningStatesForMatchingSubstitutions();
   }
   
   private static final <T> List<T> unpackFirstCombination(List<List<T>> listOfLists) {

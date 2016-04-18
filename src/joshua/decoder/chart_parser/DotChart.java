@@ -428,6 +428,10 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
     return nonTerminalMatcher.performFuzzyMatching();
   }
   
+  protected boolean useSeparateCubePruningStatesForMatchingSubstitutions(){
+    return nonTerminalMatcher.useSeparateCubePruningStatesForMatchingSubstitutions();
+  }
+  
   // ===============================================================
   // Package-protected classes
   // ===============================================================
