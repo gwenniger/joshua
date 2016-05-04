@@ -75,7 +75,7 @@ public abstract class ValidAntNodeComputer<T extends DotNodeBase<?>> {
       boolean useFixedRuleMatchingNonterminal = useFixedRuleMatchingNonterminalsFlags
           .get(nonterminalIndex);
       
-      System.err.println(">>>> createValidAntNodeComputersImprovedCubePruningFuzzyMatching >>>  useFixedRuleMatchingNonterminal: " + useFixedRuleMatchingNonterminal);
+      //System.err.println(">>>> createValidAntNodeComputersImprovedCubePruningFuzzyMatching >>>  useFixedRuleMatchingNonterminal: " + useFixedRuleMatchingNonterminal);
       
       if (useFixedRuleMatchingNonterminal) {
         result.add(ValidAntNodeComputerFuzzyMatchingFixedLabel
@@ -168,7 +168,7 @@ public abstract class ValidAntNodeComputer<T extends DotNodeBase<?>> {
 
     public static ValidAntNodeComputerFuzzyMatchingFixedLabel createValidAntNodeComputerFuzzyMatchingFixedLabel(
         DotNodeMultiLabel dotNode, int nonterminalIndex, Rule rule) {
-      System.err.println(">>>>>>>ValidAntNodeComputerFuzzyMatchingFixedLabel.createValidAntNodeComputerFuzzyMatchingFixedLabel called");
+      //System.err.println(">>>>>>>ValidAntNodeComputerFuzzyMatchingFixedLabel.createValidAntNodeComputerFuzzyMatchingFixedLabel called");
       return new ValidAntNodeComputerFuzzyMatchingFixedLabel(dotNode, nonterminalIndex,
           getSuperNodeMatchingRuleGapLabel(rule, dotNode, nonterminalIndex));
     }
@@ -190,7 +190,7 @@ public abstract class ValidAntNodeComputer<T extends DotNodeBase<?>> {
 
     @Override
     public List<HGNode> getAlternativesListNonterminal(Chart<?, ?> chart) {
-      System.err.println(">>>>ValidAntNodeComputerFuzzyMatchingFixedLabel.getAlternativesListNonterminal called ");
+      //System.err.println(">>>>ValidAntNodeComputerFuzzyMatchingFixedLabel.getAlternativesListNonterminal called ");
       return matchingLabelSuperNode.nodes;
     }
 

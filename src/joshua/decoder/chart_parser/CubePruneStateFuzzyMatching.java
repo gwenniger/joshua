@@ -39,10 +39,10 @@ public class CubePruneStateFuzzyMatching extends CubePruneStateBase<DotNodeMulti
   public static boolean superNodeMatchesRuleNonterminal(SuperNode superNode,
       Rule rule, int nonterminalIndex){    
     int ruleNonterminalKey = rule.getForeignNonTerminals()[nonterminalIndex];
-    System.err.println("ruleNonterminalKey: " + ruleNonterminalKey);
-    System.err.println("}}}}}A supernode label: " +  Vocabulary.word(superNode.lhs));
-    System.err.println("}}}}}B rule gap nontermina label: " +  Vocabulary.word(ruleNonterminalKey));
-    System.err.println("superNode.lhs:" + superNode.lhs +"  ruleNonterminalKey:" +  ruleNonterminalKey);
+    //System.err.println("ruleNonterminalKey: " + ruleNonterminalKey);
+    //System.err.println("}}}}}A supernode label: " +  Vocabulary.word(superNode.lhs));
+    //System.err.println("}}}}}B rule gap nontermina label: " +  Vocabulary.word(ruleNonterminalKey));
+    //System.err.println("superNode.lhs:" + superNode.lhs +"  ruleNonterminalKey:" +  ruleNonterminalKey);
     // Here we use the vocabulary for safety, because the supernode.lhs uses negative 
     // indices while the rule nonterminals use positive indices, but the sign is irrelevant for the label
     // rather than using the abs method here we compare via a mapping to actual labels
@@ -55,7 +55,7 @@ public class CubePruneStateFuzzyMatching extends CubePruneStateBase<DotNodeMulti
 
     for (SuperNode superNode : dotNode.getAntSuperNodes().get(nonterminalIndex)) {   
       if (superNodeMatchesRuleNonterminal(superNode, rule, nonterminalIndex)) {
-        System.err.println("}}} MATCH!!!");
+        //System.err.println("}}} MATCH!!!");
         return true;
       }
     }

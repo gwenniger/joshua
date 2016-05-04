@@ -335,7 +335,7 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
    */
   private void addSeparateCandidatesForMatchingAndNonMatchingSubstitutions(int i, int j, PriorityQueue<CubePruneStateBase<T>> candidates,     
       List<Rule> rules,Rule bestRule,SourcePath sourcePath,T dotNode){
-    System.err.println(">>> addSeparateCandidatesForMatchingAndNonMatchingSubstitutions...");
+    //System.err.println(">>> addSeparateCandidatesForMatchingAndNonMatchingSubstitutions...");
     for(List<Boolean> fixedRuleMatchingNonterminalsFlagsAlternative : CubePruneStateFuzzyMatching.createCubePruningStateCreationFixedRuleMatchingNonterminalsFlagsAlternatives((DotNodeMultiLabel) dotNode, bestRule)){
       //Assert.assertTrue(fixedRuleMatchingNonterminalsFlagsAlternative.size() > 0);
       addNewCandidate(i,j,candidates, rules, bestRule, sourcePath, dotNode,fixedRuleMatchingNonterminalsFlagsAlternative);
