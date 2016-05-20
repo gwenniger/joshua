@@ -36,6 +36,13 @@ public class CubePruneStateFuzzyMatching extends CubePruneStateBase<DotNodeMulti
             rule, useFixedRuleMatchingNonterminalsFlags));
   }
 
+  public static CubePruneStateFuzzyMatching createCubePruneStateFuzzyMatchingImprovedCubePruningGlueRule(
+      ComputeNodeResult score, int[] ranks, List<Rule> rules, List<HGNode> antecedents,
+      DotNodeMultiLabel dotNode, Rule rule, SuperNode selectedSuperNodeSecondGlueRuleNonterminal) {
+    return new CubePruneStateFuzzyMatching(score, ranks, rules, antecedents, dotNode,
+      ValidAntNodeComputerFuzzyMatchingFixedLabel.createValidAntNodeComputersImprovedCubePruningFuzzyMatchingGlueRule(dotNode, rule, selectedSuperNodeSecondGlueRuleNonterminal));
+  }
+  
   public static boolean superNodeMatchesRuleNonterminal(SuperNode superNode,
       Rule rule, int nonterminalIndex){    
     int ruleNonterminalKey = rule.getForeignNonTerminals()[nonterminalIndex];

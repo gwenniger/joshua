@@ -44,6 +44,8 @@ public class JoshuaConfiguration {
   public String default_non_terminal = FormatUtils.markup("X");
   public String goal_symbol = FormatUtils.markup("GOAL");
 
+  public static String STANDARD_GLUE_RULE_RIGHT_HAND_SIDE_LABEL = FormatUtils.markup("X");
+  
   /*
    * A list of OOV symbols in the form
    * 

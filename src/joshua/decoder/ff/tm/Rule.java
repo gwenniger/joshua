@@ -1,5 +1,7 @@
 package joshua.decoder.ff.tm;
 
+import static joshua.util.FormatUtils.cleanNonTerminal;
+
 import java.util.Arrays;  
 import java.util.Comparator;
 import java.util.List;
@@ -7,6 +9,7 @@ import java.util.regex.Pattern;
 
 import joshua.corpus.Vocabulary;
 import joshua.decoder.Decoder;
+import joshua.decoder.JoshuaConfiguration;
 import joshua.decoder.ff.FeatureFunction;
 import joshua.decoder.ff.FeatureVector;
 import joshua.decoder.segment_file.Sentence;
@@ -502,5 +505,54 @@ public class Rule implements Comparator<Rule>, Comparable<Rule> {
 
   public String getRuleString() {
     return String.format("%s -> %s ||| %s", Vocabulary.word(getLHS()), getFrenchWords(), getEnglishWords());
+  }
+  
+  private String getGoalSymbol(JoshuaConfiguration joshuaConfiguration){
+    return joshuaConfiguration.goal_symbol;
+  }
+  
+  private int getGoalSymbolIndex(JoshuaConfiguration joshuaConfiguration){
+    return Vocabulary.id(getGoalSymbol(joshuaConfiguration));
+  }
+  
+  private int getGlueRuleRightHandSideLabel(){
+    return Vocabulary.id(JoshuaConfiguration.STANDARD_GLUE_RULE_RIGHT_HAND_SIDE_LABEL);
+  }
+  
+  private boolean leftHandSideLabelIsGoalLabel(JoshuaConfiguration joshuaConfiguration){
+    return this.lhs == getGoalSymbolIndex(joshuaConfiguration);
+  }
+  
+  private boolean firstRightHandSideNonterminalLabelIsGoal(JoshuaConfiguration joshuaConfiguration){
+    return this.getFrench()[0] == getGoalSymbolIndex(joshuaConfiguration);
+  }
+  
+  private boolean secondRightHandSideNonterminalLabelIsGlueRuleRightHandSideLabel(JoshuaConfiguration joshuaConfiguration){
+    return this.getFrench()[1] == getGlueRuleRightHandSideLabel();
+  }
+  
+  @SuppressWarnings("unused")
+  /**
+   * Convenience method for testing correctness isGlueRule method
+   * @return
+   */
+  private String getRuleLabelsString(){
+    String result = "";
+    result += Vocabulary.word(lhs);
+    for(Integer nonterminalLabelKey : getFrench()){
+      result += " " + Vocabulary.word(nonterminalLabelKey);
+    }
+    return result;
+  }
+  
+  public boolean isGlueRule(JoshuaConfiguration joshuaConfiguration){
+    boolean result = false;
+    if(this.getFrench().length == 2){
+      result = leftHandSideLabelIsGoalLabel(joshuaConfiguration) && 
+          firstRightHandSideNonterminalLabelIsGoal(joshuaConfiguration) &&
+          secondRightHandSideNonterminalLabelIsGlueRuleRightHandSideLabel(joshuaConfiguration);
+    }
+    //System.err.println(">>> Gideon: rule: " + getRuleLabelsString() + " IsGlueRule? " + result);
+    return result;
   }
 }

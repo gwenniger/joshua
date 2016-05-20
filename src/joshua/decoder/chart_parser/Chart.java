@@ -17,7 +17,9 @@ import joshua.decoder.chart_parser.CubePruneStateBase;
 import joshua.decoder.chart_parser.DotChart.DotNode;
 import joshua.decoder.chart_parser.DotChart.DotNodeBase;
 import joshua.decoder.chart_parser.DotChart.DotNodeMultiLabel;
+import joshua.decoder.chart_parser.ValidAntNodeComputer.ValidAntNodeComputerBasic;
 import joshua.decoder.chart_parser.ValidAntNodeComputer.ValidAntNodeComputerFuzzyMatching;
+import joshua.decoder.chart_parser.ValidAntNodeComputer.ValidAntNodeComputerFuzzyMatchingFixedLabel;
 import joshua.decoder.ff.FeatureFunction;
 import joshua.decoder.ff.SourceDependentFF;
 import joshua.decoder.ff.tm.AbstractGrammar;
@@ -297,7 +299,12 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
               //addNewCandidate(i,j,candidates, rules, bestRule, sourcePath, dotNode, unpackedSuperNodeList);          
             //}   
             if(useSeparateCubePruningStatesForMatchingSubstitutions()){
-              addSeparateCandidatesForMatchingAndNonMatchingSubstitutions(arity, j, candidates, rules, bestRule, sourcePath, dotNode);
+              if(bestRule.isGlueRule(this.config)){               
+                addSeparateGlueRuleCandidatesForEachSubstitutedToLabel(arity, j, candidates, rules, bestRule, sourcePath, (DotNodeMultiLabel) dotNode); 
+              }
+              else{
+                addSeparateCandidatesForMatchingAndNonMatchingSubstitutions(arity, j, candidates, rules, bestRule, sourcePath, dotNode);
+              }
             }
             else{
               addNewCandidate(i,j,candidates, rules, bestRule, sourcePath, dotNode,null);
@@ -305,8 +312,8 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
           }
           else{
           
-            @SuppressWarnings("unchecked")
-            List<SuperNode> superNodes = (List<SuperNode>) dotNode.getAntSuperNodes();
+            //@SuppressWarnings("unchecked")
+            //List<SuperNode> superNodes = (List<SuperNode>) dotNode.getAntSuperNodes();
             
             //addNewCandidate(i,j,candidates, rules, bestRule, sourcePath, dotNode, superNodes);
             addNewCandidate(i,j,candidates, rules, bestRule, sourcePath, dotNode,null);
@@ -342,6 +349,41 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
     }
   }
   
+ 
+  /**
+   * This method adds separate candidates for each label a glue rule can substitute to. 
+   * This is motivated by the fact that when doing fuzzy matching, for the special case of glue rules
+   *  it may be sub-optimal if only the label for the best chart entry is explored.
+   *  The reason is that this leaves no good chance to learn and use the glue rule substitution 
+   *  features effectively, which serve as a kind of priors for adding translation subtree root labels by means 
+   *  of glue rules. 
+   *  
+   * chance to learn 
+   * @param i
+   * @param j
+   * @param candidates
+   * @param rules
+   * @param bestRule
+   * @param sourcePath
+   * @param dotNodeMultiLabel
+   */
+  private void addSeparateGlueRuleCandidatesForEachSubstitutedToLabel(int i, int j, PriorityQueue<CubePruneStateBase<T>> candidates,     
+      List<Rule> rules,Rule bestRule,SourcePath sourcePath,DotNodeMultiLabel dotNodeMultiLabel){
+    //System.err.println(">>> addSeparateCandidatesForMatchingAndNonMatchingSubstitutions...");
+    if(dotNodeMultiLabel.getAntSuperNodes().size() != 2){
+      throw new RuntimeException("Error: supposed to be glue rule has wrong number of left hand side nonterminals");
+    }
+    
+    if(dotNodeMultiLabel.getAntSuperNodes().get(0).size() != 1){
+      throw new RuntimeException("Error: supposed to be glue rule has wrong number of alternatives for first label, should have only one alternative");
+    }
+    
+    for(SuperNode selectedSuperNodeSecondGlueRuleNonterminal : dotNodeMultiLabel.getAntSuperNodes().get(1)){
+      //Assert.assertTrue(fixedRuleMatchingNonterminalsFlagsAlternative.size() > 0);
+     // System.err.println(">>>> Gideon: Adding glue rule candidate for label " + Vocabulary.word(selectedSuperNodeSecondGlueRuleNonterminal.lhs));
+      addNewCandidateGlueRule(i, j, candidates, rules, bestRule, sourcePath, dotNodeMultiLabel, selectedSuperNodeSecondGlueRuleNonterminal);
+    }
+  }
   
   /**
    *  Get the current tail nodes for a dotNode, depending on whether we are doing fuzzy 
@@ -374,6 +416,25 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
     }    
     
   }
+  
+  /**
+   *  Get the current tail nodes for a dotNode, depending on whether we are doing fuzzy 
+   *  matching or not. 
+   * @param dotNode
+   * @return
+   */
+  private  List<HGNode> getCurrentTailNodesForDotNodeGlueRule(DotNodeMultiLabel dotNode,
+      int[] ranks, Chart<?, ?> chart,Rule rule, SuperNode selectedSuperNodeSecondGlueRuleNonterminal){
+    
+
+      NextAntNodesPreparer<DotNodeMultiLabel> cubePruneStatePreparer = NextAntNodesPreparer.createNextAntNodesPreparer(ranks, 
+          ValidAntNodeComputerFuzzyMatchingFixedLabel.createValidAntNodeComputersImprovedCubePruningFuzzyMatchingGlueRule(dotNode, rule, selectedSuperNodeSecondGlueRuleNonterminal), chart);
+      return cubePruneStatePreparer.getNextAntNodes();
+        
+ 
+    
+  }
+  
   
   @SuppressWarnings("unchecked")
   private void addNewCandidate(int i, int j, PriorityQueue<CubePruneStateBase<T>> candidates,
@@ -418,6 +479,30 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
           (DotNode)dotNode);
     }               
         
+    candidates.add(bestState);
+  }
+  
+  
+  @SuppressWarnings("unchecked")
+  private void addNewCandidateGlueRule(int i, int j, PriorityQueue<CubePruneStateBase<T>> candidates,
+      List<Rule> rules,Rule bestRule,SourcePath sourcePath,DotNodeMultiLabel dotNode, SuperNode selectedSuperNodeSecondGlueRuleNonterminal){
+  
+
+    int[] ranks = new int[1 + dotNode.getAntSuperNodes().size()];
+    Arrays.fill(ranks, 1);
+    List<HGNode> currentTailNodes = getCurrentTailNodesForDotNodeGlueRule(dotNode, ranks, this, bestRule, selectedSuperNodeSecondGlueRuleNonterminal);
+  
+
+    ComputeNodeResult result = new ComputeNodeResult(featureFunctions, bestRule,
+        currentTailNodes, i, j, sourcePath, sentence);
+    CubePruneStateBase<T> bestState = null; 
+        
+    
+   
+      bestState = (CubePruneStateBase<T>) 
+      CubePruneStateFuzzyMatching.createCubePruneStateFuzzyMatchingImprovedCubePruningGlueRule(result, ranks, rules, currentTailNodes, dotNode, bestRule, selectedSuperNodeSecondGlueRuleNonterminal);
+
+                          
     candidates.add(bestState);
   }
   

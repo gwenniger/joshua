@@ -3,6 +3,7 @@ package joshua.decoder.chart_parser;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+
 import joshua.decoder.chart_parser.DotChart.DotNode;
 import joshua.decoder.chart_parser.DotChart.DotNodeBase;
 import joshua.decoder.chart_parser.DotChart.DotNodeMultiLabel;
@@ -79,7 +80,7 @@ public abstract class ValidAntNodeComputer<T extends DotNodeBase<?>> {
       
       if (useFixedRuleMatchingNonterminal) {
         result.add(ValidAntNodeComputerFuzzyMatchingFixedLabel
-            .createValidAntNodeComputerFuzzyMatchingFixedLabel(dotNode, nonterminalIndex, rule));
+            .createValidAntNodeComputerFuzzyMatchingFixedMatchingLabel(dotNode, nonterminalIndex, rule));
       } else {
         result.add(ValidAntNodeComputer
             .createValidAntNodeComputerFuzzyMatchingNotMatchingRuleLabel(dotNode, nonterminalIndex,
@@ -88,6 +89,18 @@ public abstract class ValidAntNodeComputer<T extends DotNodeBase<?>> {
     }
     return result;
   }
+  
+  public static List<ValidAntNodeComputer<DotNodeMultiLabel>> createValidAntNodeComputersImprovedCubePruningFuzzyMatchingGlueRule(DotNodeMultiLabel dotNode, Rule rule, SuperNode selectedSuperNodeSecondGlueRuleNonterminal){
+
+    List<ValidAntNodeComputer<DotNodeMultiLabel>> validAntNodeComputers = new ArrayList<ValidAntNodeComputer<DotNodeMultiLabel>>();
+    validAntNodeComputers.add(ValidAntNodeComputerFuzzyMatchingFixedLabel.createValidAntNodeComputerFuzzyMatchingFixedMatchingLabel(dotNode, 0, rule));
+    validAntNodeComputers.add(ValidAntNodeComputerFuzzyMatchingFixedLabel.createValidAntNodeComputerFuzzyMatchingFixedLabelSpecificSuperNode(dotNode, 1, selectedSuperNodeSecondGlueRuleNonterminal));
+    return validAntNodeComputers;
+  }
+  
+  
+
+  
   
   /**
    * This method returns the list of alternative possible HGNode instances for a nonterminal index.
@@ -166,11 +179,18 @@ public abstract class ValidAntNodeComputer<T extends DotNodeBase<?>> {
       this.matchingLabelSuperNode = matchingLabelSuperNode;
     }
 
-    public static ValidAntNodeComputerFuzzyMatchingFixedLabel createValidAntNodeComputerFuzzyMatchingFixedLabel(
+    public static ValidAntNodeComputerFuzzyMatchingFixedLabel createValidAntNodeComputerFuzzyMatchingFixedMatchingLabel(
         DotNodeMultiLabel dotNode, int nonterminalIndex, Rule rule) {
       //System.err.println(">>>>>>>ValidAntNodeComputerFuzzyMatchingFixedLabel.createValidAntNodeComputerFuzzyMatchingFixedLabel called");
       return new ValidAntNodeComputerFuzzyMatchingFixedLabel(dotNode, nonterminalIndex,
           getSuperNodeMatchingRuleGapLabel(rule, dotNode, nonterminalIndex));
+    }
+    
+    public static ValidAntNodeComputerFuzzyMatchingFixedLabel createValidAntNodeComputerFuzzyMatchingFixedLabelSpecificSuperNode(
+        DotNodeMultiLabel dotNode, int nonterminalIndex, SuperNode selectedSuperNode) {
+      //System.err.println(">>>>>>>ValidAntNodeComputerFuzzyMatchingFixedLabel.createValidAntNodeComputerFuzzyMatchingFixedLabel called");
+      return new ValidAntNodeComputerFuzzyMatchingFixedLabel(dotNode, nonterminalIndex,
+          selectedSuperNode);
     }
 
 
