@@ -299,7 +299,7 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
               //addNewCandidate(i,j,candidates, rules, bestRule, sourcePath, dotNode, unpackedSuperNodeList);          
             //}   
             if(useSeparateCubePruningStatesForMatchingSubstitutions()){
-              if(bestRule.isGlueRule(this.config)){               
+              if(exploreAllLabelsForGlueRulesInCubePruningInitialization() && bestRule.isGlueRule(this.config)){               
                 addSeparateGlueRuleCandidatesForEachSubstitutedToLabel(arity, j, candidates, rules, bestRule, sourcePath, (DotNodeMultiLabel) dotNode); 
               }
               else{
@@ -633,6 +633,10 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
   
   private boolean useSeparateCubePruningStatesForMatchingSubstitutions(){
     return this.dotcharts[0].useSeparateCubePruningStatesForMatchingSubstitutions();
+  }
+  
+  protected boolean exploreAllLabelsForGlueRulesInCubePruningInitialization() {
+    return this.dotcharts[0].exploreAllLabelsForGlueRulesInCubePruningInitialization();
   }
   
   private static final <T> List<T> unpackFirstCombination(List<List<T>> listOfLists) {

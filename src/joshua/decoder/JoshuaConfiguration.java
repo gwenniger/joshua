@@ -203,6 +203,10 @@ public class JoshuaConfiguration {
 
   public static final String SOFT_SYNTACTIC_CONSTRAINT_DECODING_PROPERTY_NAME = "fuzzy_matching";
   
+  
+  public boolean explore_all_labels_for_glue_rules_in_cube_pruning_initialization;
+  public static final String EXPLORE_ALL_LABELS_FOR_GLUE_RULES_IN_CUBE_PRUNING_INITIALIZATION_PROPERTY_NAME = "explore_all_labels_for_glue_rules_in_cube_pruning_initialization";
+  
   /*
    * Whether to use separate cube pruning states for matching substitutions. This is only applicable 
    * in case fuzzy matching is used. The goal of using these separate states is to increase the 
@@ -578,6 +582,12 @@ public class JoshuaConfiguration {
               .equals(normalize_key(SEPARATE_CUBE_PRUNING_STATES_MATCHING_SUBSTITUTIONS_PROPERTY_NAME))) {
             separate_cube_pruning_states_for_matching_substitutions = Boolean.parseBoolean(fds[1]);
             logger.finest(String.format(SEPARATE_CUBE_PRUNING_STATES_MATCHING_SUBSTITUTIONS_PROPERTY_NAME + ": %s",  separate_cube_pruning_states_for_matching_substitutions));
+
+          }
+          else if (parameter
+              .equals(normalize_key(EXPLORE_ALL_LABELS_FOR_GLUE_RULES_IN_CUBE_PRUNING_INITIALIZATION_PROPERTY_NAME))) {
+            explore_all_labels_for_glue_rules_in_cube_pruning_initialization = Boolean.parseBoolean(fds[1]);
+            logger.finest(String.format(EXPLORE_ALL_LABELS_FOR_GLUE_RULES_IN_CUBE_PRUNING_INITIALIZATION_PROPERTY_NAME + ": %s",  explore_all_labels_for_glue_rules_in_cube_pruning_initialization));
 
           } 
           else if (parameter.equals(normalize_key("fragment-map"))) {
