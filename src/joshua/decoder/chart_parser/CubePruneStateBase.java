@@ -73,16 +73,40 @@ public abstract class CubePruneStateBase<T extends joshua.decoder.chart_parser.D
         return false;
     if (getDotNode() != state.getDotNode())
       return false;
+    
+    // For the two cube pruning states to be equal, in addition to the ranks and the DotNodes, the 
+    // lists with acceptable labels from the ValidAntNodeComputers should also be equal.
+    // This is necessary because in case of DotNodeMultiLabel, multiple CubePruneStates are 
+    // created possibly for the same DotNodeMultiLabel, but these states are distinguished 
+    // by their ValidAntNodeComputers
+    for(int i = 0 ; i < validAntNodeComputers.size(); i++){
+     List<Integer> acceptableLabelsThisNonterminalI =   this.validAntNodeComputers.get(i).getAcceptableLabelIndicesNonterminal();
+     List<Integer> acceptableLabelsStateNonterminalI =   state.validAntNodeComputers.get(i).getAcceptableLabelIndicesNonterminal();
+     if(!acceptableLabelsThisNonterminalI.equals(acceptableLabelsStateNonterminalI)){
+       return false;
+     }
+    }
 
     return true;
   }
 
   public int hashCode() {
+    int prime = 31;
     int hash = (dotNode != null) ? dotNode.hashCode() : 0;
-    hash += Arrays.hashCode(ranks);
-
+    hash = hash * prime +  Arrays.hashCode(ranks);
+    hash = hash * prime + hashCodeValidAntNodeComputers();
     return hash;
   }
+  
+  private  int hashCodeValidAntNodeComputers(){
+    int prime = 31;
+    int hash = 1;
+    for(ValidAntNodeComputer<?>  validAntNodeComputer: validAntNodeComputers){
+      hash = hash * prime + validAntNodeComputer.getAcceptableLabelIndicesNonterminal().hashCode();
+    }
+    return hash;
+  }
+  
 
   /**
    * Compares states by ExpectedTotalLogP, allowing states to be sorted according to their inverse
