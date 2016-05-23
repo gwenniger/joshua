@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import joshua.corpus.Vocabulary;
 import joshua.decoder.chart_parser.DotChart.DotNode;
 import joshua.decoder.chart_parser.DotChart.DotNodeBase;
 import joshua.decoder.chart_parser.DotChart.DotNodeMultiLabel;
@@ -140,8 +141,8 @@ public abstract class ValidAntNodeComputer<T extends DotNodeBase<?>> {
     // nextRanks[nonterminalIndex+1]);
 
     while (nextRanks[nonterminalIndex + 1] <= numAlternatives) {
-      HGNode node = getAlternativesListNonterminal(chart).get(nextRanks[nonterminalIndex + 1] - 1);
-      // System.err.println("Gideon: node.lhs: " + node.lhs);
+      int index = nextRanks[nonterminalIndex + 1] - 1;
+      HGNode node = getAlternativesListNonterminal(chart).get(index);       
       if (acceptableLabelIndices.contains(node.lhs)) {
         return node;
       } else {
@@ -236,12 +237,13 @@ public abstract class ValidAntNodeComputer<T extends DotNodeBase<?>> {
 
     public static List<Integer> getAcceptableLabelIndicesNonterminalNotMatchingRuleLabel(
         DotNodeMultiLabel dotNode, int nonterminalIndex, Rule rule) {
-      int ruleNonterminalKey = rule.getForeignNonTerminals()[nonterminalIndex];
       List<Integer> result = new ArrayList<Integer>();
       for (SuperNode superNode : dotNode.getAntSuperNodes().get(nonterminalIndex)) {
         int key = superNode.lhs;
-        if (key != ruleNonterminalKey) {
+        if (!CubePruneStateFuzzyMatching.superNodeMatchesRuleNonterminal(superNode,
+            rule, nonterminalIndex)) {
           result.add(key);
+          //System.err.println(">>> adding key for word" + Vocabulary.word(key));
         }
       }
       return result;

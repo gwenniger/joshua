@@ -109,10 +109,6 @@ public abstract class CubePruneStateBase<T extends joshua.decoder.chart_parser.D
     return validAntNodeComputers.get(nonterminalIndex).getAcceptableLabelIndicesNonterminal();
   }
   
-  public HGNode findNextValidAntNodeAndUpdateRanks(int[] nextRanks, int nonterminalIndex, Chart<?,?> chart){
-    return validAntNodeComputers.get(nonterminalIndex).findNextValidAntNodeAndUpdateRanks(nextRanks, chart);
-  }
-  
   public List<ValidAntNodeComputer<T>> getValidAntNodeComputers(){
     return this.validAntNodeComputers;
   }

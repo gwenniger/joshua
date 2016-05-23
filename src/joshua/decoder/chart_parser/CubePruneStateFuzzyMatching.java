@@ -53,7 +53,10 @@ public class CubePruneStateFuzzyMatching extends CubePruneStateBase<DotNodeMulti
     // Here we use the vocabulary for safety, because the supernode.lhs uses negative 
     // indices while the rule nonterminals use positive indices, but the sign is irrelevant for the label
     // rather than using the abs method here we compare via a mapping to actual labels
-    return Vocabulary.word(superNode.lhs).equals(Vocabulary.word(ruleNonterminalKey));
+    
+    boolean result =  Vocabulary.word(superNode.lhs).equals(Vocabulary.word(ruleNonterminalKey));
+   // System.err.println(">>>>>> " + Vocabulary.word(superNode.lhs) + " matches " + Vocabulary.word(ruleNonterminalKey) + "?" + result);
+    return result;
   }
   
   private static boolean hasMatchingSubstitutions(DotNodeMultiLabel dotNode, Rule rule,
