@@ -46,8 +46,10 @@ public abstract class CubePruneStateBase<T extends joshua.decoder.chart_parser.D
 
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("STATE ||| rule=" + getRule() + " inside cost = " + computeNodeResult.getViterbiCost()
-        + " estimate = " + computeNodeResult.getPruningEstimate());
+    sb.append("STATE ||| rule=" + getRule() );
+    if(computeNodeResult != null){
+      sb.append(" inside cost = " + computeNodeResult.getViterbiCost() + " estimate = " + computeNodeResult.getPruningEstimate());
+    }
     return sb.toString();
   }
 
@@ -85,6 +87,7 @@ public abstract class CubePruneStateBase<T extends joshua.decoder.chart_parser.D
      if(!acceptableLabelsThisNonterminalI.equals(acceptableLabelsStateNonterminalI)){
        return false;
      }
+    
     }
 
     return true;
@@ -122,6 +125,15 @@ public abstract class CubePruneStateBase<T extends joshua.decoder.chart_parser.D
     } else {
       return -1;
     }
+  }
+  
+  /**
+   * It is convenient to be able to set the node result at a later state, when we are sure the 
+   * CubePruneState is not a repeat and will actually be added
+   * @param computeNodeResult
+   */
+  public void setNodeResult(ComputeNodeResult computeNodeResult){
+    this.computeNodeResult = computeNodeResult;
   }
   
  

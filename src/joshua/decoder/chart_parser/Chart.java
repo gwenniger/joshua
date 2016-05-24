@@ -569,8 +569,7 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
           continue;
         }
         
-        ComputeNodeResult computeNodeResult = new ComputeNodeResult(featureFunctions,
-            nextRule, nextAntNodes, i, j, sourcePath, this.sentence);       
+        
         
         /* Create the next state. */
         CubePruneStateBase<T> nextState = null;
@@ -581,21 +580,39 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
             validAntNodeComputersCasted.add((ValidAntNodeComputer<DotNodeMultiLabel>) validAntNodeComputer);
           }          
           
-          nextState = (CubePruneStateBase<T>) new CubePruneStateFuzzyMatching(computeNodeResult, nextRanks, rules,
+          // When first creating the state, we do not compute the node result yet, but instantiate it to null
+          nextState = (CubePruneStateBase<T>) new CubePruneStateFuzzyMatching(null, nextRanks, rules,
               nextAntNodes, (DotNodeMultiLabel)dotNode,validAntNodeComputersCasted);
         }
         else{
-          nextState = (CubePruneStateBase<T>) CubePruneState.createCubePruneState(computeNodeResult, nextRanks, rules,
+          // When first creating the state, we do not compute the node result yet, but instantiate it to null
+          nextState = (CubePruneStateBase<T>) CubePruneState.createCubePruneState(null, nextRanks, rules,
               nextAntNodes, (DotNode)dotNode);
         }
         
         
         /* Skip states that have been explored before. */
-        if (visitedStates.contains(nextState))
+        if (visitedStates.contains(nextState)){
+         /*
+          System.err.println(">>>> Repeated same state " + nextState + " ... continue ...");
+          System.err.println("state ranks:");
+          for(int rankIndex = 0; rankIndex < nextState.ranks.length; rankIndex++){
+            System.err.println("rank:  " + nextState.ranks[rankIndex]);
+          }*/
           continue;
-
-        visitedStates.add(nextState);
-        candidates.add(nextState);
+        }
+        else{                    
+          // We have now established the state is actually needed, and not a repeat of 
+          // an earlier state reached in a different way.
+          // Therefore, only now we will do the actual cost computation, which is expensive.
+          ComputeNodeResult computeNodeResult = new ComputeNodeResult(featureFunctions,
+              nextRule, nextAntNodes, i, j, sourcePath, this.sentence);   
+          
+          nextState.setNodeResult(computeNodeResult);
+          
+          visitedStates.add(nextState);
+          candidates.add(nextState);
+        }   
       }
     }
   }
