@@ -115,6 +115,7 @@ public abstract class NonterminalMatcher <T extends DotNodeBase> {
   
   
   protected abstract boolean performFuzzyMatching();
+  protected abstract boolean exploreAllPossibleLabelSubstitutionsForAllRulesInCubePruningInitialization();
   protected abstract boolean useSeparateCubePruningStatesForMatchingSubstitutions();
   protected abstract boolean exploreAllLabelsForGlueRulesInCubePruningInitialization();
 
@@ -212,6 +213,11 @@ public abstract class NonterminalMatcher <T extends DotNodeBase> {
     protected boolean exploreAllLabelsForGlueRulesInCubePruningInitialization() {
       return false;
     }
+
+    @Override
+    protected boolean exploreAllPossibleLabelSubstitutionsForAllRulesInCubePruningInitialization() {
+      return false;
+    }
   }
 
   protected static class StandardNonterminalMatcherSoftConstraints extends
@@ -267,6 +273,11 @@ public abstract class NonterminalMatcher <T extends DotNodeBase> {
     @Override
     protected boolean exploreAllLabelsForGlueRulesInCubePruningInitialization() {
       return joshuaConfiguration.explore_all_labels_for_glue_rules_in_cube_pruning_initialization;
+    }
+
+    @Override
+    protected boolean exploreAllPossibleLabelSubstitutionsForAllRulesInCubePruningInitialization() {
+      return joshuaConfiguration.explore_all_possible_label_substitutions_for_all_rules_in_cube_pruning_initialization;
     }
   }
   

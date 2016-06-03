@@ -297,8 +297,22 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
               //addNewCubePruneState(i, j, rules, dotNode, bestRule,unpackedSuperNodeList, arity, sourcePath, candidates, visitedStates);
               
               //addNewCandidate(i,j,candidates, rules, bestRule, sourcePath, dotNode, unpackedSuperNodeList);          
+           
             //}   
-            if(useSeparateCubePruningStatesForMatchingSubstitutions()){
+            
+          
+            
+            if(exploreAllPossibleLabelSubstitutionsForAllRulesInCubePruningInitialization()){
+           
+            
+             List<List<SuperNode>> superNodeCombinationsList = unpackAllPossibleTCombinations(superNodes);
+             // Add a separate cube pruning state fore every label substitution combination
+               for(List<SuperNode> superNodeCombination : superNodeCombinationsList){
+                  addNewCandidateForSelectedSuperNodes(arity, j, candidates, rules, bestRule, sourcePath, (DotNodeMultiLabel) dotNode, superNodeCombination);
+               }
+             
+            }                   
+            else if(useSeparateCubePruningStatesForMatchingSubstitutions()){
               if(exploreAllLabelsForGlueRulesInCubePruningInitialization() && bestRule.isGlueRule(this.config)){               
                 addSeparateGlueRuleCandidatesForEachSubstitutedToLabel(arity, j, candidates, rules, bestRule, sourcePath, (DotNodeMultiLabel) dotNode); 
               }
@@ -384,6 +398,26 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
       addNewCandidateGlueRule(i, j, candidates, rules, bestRule, sourcePath, dotNodeMultiLabel, selectedSuperNodeSecondGlueRuleNonterminal);
     }
   }
+
+  /**
+   *  Get the valid ant node computers for a dotNode, depending on whether we are doing fuzzy 
+   *  matching or not. 
+   * @param dotNode
+   * @return
+   */
+  private    List<ValidAntNodeComputer<DotNodeMultiLabel>>  getValidAntNodeComputersForDotNode(T dotNode,
+      int[] ranks, Chart<?, ?> chart,Rule rule, List<Boolean> useFixedRuleMatchingNonterminalsFlags){
+    List<ValidAntNodeComputer<DotNodeMultiLabel>> validAntNodeComputers = null;
+    if(useSeparateCubePruningStatesForMatchingSubstitutions()){
+      validAntNodeComputers = ValidAntNodeComputer.createValidAntNodeComputersImprovedCubePruningFuzzyMatching((DotNodeMultiLabel) dotNode, rule,
+          useFixedRuleMatchingNonterminalsFlags);  
+    }
+    else{
+      validAntNodeComputers = ValidAntNodeComputer.createValidAntNodeComputersStandardFuzzyMatching((DotNodeMultiLabel) dotNode);
+    }
+    return validAntNodeComputers;
+  }
+  
   
   /**
    *  Get the current tail nodes for a dotNode, depending on whether we are doing fuzzy 
@@ -391,37 +425,21 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
    * @param dotNode
    * @return
    */
-  private  List<HGNode> getCurrentTailNodesForDotNode(T dotNode,
-      int[] ranks, Chart<?, ?> chart,Rule rule, List<Boolean> useFixedRuleMatchingNonterminalsFlags){
-    
-    if(peformFuzzyMatching()){
-      List<ValidAntNodeComputer<DotNodeMultiLabel>> validAntNodeComputers = null;
-      if(useSeparateCubePruningStatesForMatchingSubstitutions()){
-        validAntNodeComputers = ValidAntNodeComputer.createValidAntNodeComputersImprovedCubePruningFuzzyMatching((DotNodeMultiLabel) dotNode, rule,
-            useFixedRuleMatchingNonterminalsFlags);  
-      }else{
-        validAntNodeComputers = ValidAntNodeComputer.createValidAntNodeComputersStandardFuzzyMatching((DotNodeMultiLabel) dotNode);
-      }
-      
-      NextAntNodesPreparer<DotNodeMultiLabel> cubePruneStatePreparer = NextAntNodesPreparer.createNextAntNodesPreparer(ranks, validAntNodeComputers, chart);
-      return cubePruneStatePreparer.getNextAntNodes();
-    }    
-    else{
-      List<HGNode> currentTailNodes = new ArrayList<HGNode>();
-      DotNode dotNodeCasted = (DotNode) dotNode;      
-      for (SuperNode si : dotNodeCasted.getAntSuperNodes()) {
-        currentTailNodes.add(si.nodes.get(0));
-      }
-      return currentTailNodes;
-    }    
-    
-  }
+  private  List<HGNode> getCurrentTailNodesForDotNodeStrictMatching(T dotNode,
+      int[] ranks, Chart<?, ?> chart,Rule rule)
+   {
+    List<HGNode> currentTailNodes = new ArrayList<HGNode>();
+    DotNode dotNodeCasted = (DotNode) dotNode;      
+    for (SuperNode si : dotNodeCasted.getAntSuperNodes()) {
+      currentTailNodes.add(si.nodes.get(0));
+    }
+    return currentTailNodes;
+    }
   
-  private  List<HGNode> getCurrentTailNodesForDotNodeGlueRule(DotNodeMultiLabel dotNode,
-      int[] ranks, Chart<?, ?> chart,Rule rule, SuperNode selectedSuperNodeSecondGlueRuleNonterminal){
-
-      NextAntNodesPreparer<DotNodeMultiLabel> cubePruneStatePreparer = NextAntNodesPreparer.createNextAntNodesPreparer(ranks, 
-          ValidAntNodeComputerFuzzyMatchingFixedLabel.createValidAntNodeComputersImprovedCubePruningFuzzyMatchingGlueRule(dotNode, rule, selectedSuperNodeSecondGlueRuleNonterminal), chart);
+  
+  private  List<HGNode> getCurrentTailNodesForDotNode(
+      int[] ranks, Chart<?, ?> chart,List<ValidAntNodeComputer<DotNodeMultiLabel>> validAntNodeComputers){
+      NextAntNodesPreparer<DotNodeMultiLabel> cubePruneStatePreparer = NextAntNodesPreparer.createNextAntNodesPreparer(ranks,validAntNodeComputers,this);        
       return cubePruneStatePreparer.getNextAntNodes();
   }
   
@@ -443,24 +461,24 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
 
     int[] ranks = new int[1 + dotNode.getAntSuperNodes().size()];
     Arrays.fill(ranks, 1);
-    List<HGNode> currentTailNodes = getCurrentTailNodesForDotNode(dotNode, ranks, this,bestRule,useFixedRuleMatchingNonterminalsFlags);
-  
-
+    
+    List<HGNode> currentTailNodes = null; 
+    List<ValidAntNodeComputer<DotNodeMultiLabel>> validAntNodeComputers = null;
+    if(peformFuzzyMatching())    {
+      validAntNodeComputers = getValidAntNodeComputersForDotNode(dotNode, ranks, this, bestRule, useFixedRuleMatchingNonterminalsFlags);
+      currentTailNodes =  getCurrentTailNodesForDotNode(ranks, this, validAntNodeComputers);
+    }
+    else{
+      currentTailNodes = getCurrentTailNodesForDotNodeStrictMatching(dotNode, ranks, this, bestRule);
+    }
+       
     ComputeNodeResult result = new ComputeNodeResult(featureFunctions, bestRule,
         currentTailNodes, i, j, sourcePath, sentence);
     CubePruneStateBase<T> bestState = null; 
         
-    if(peformFuzzyMatching()){
-      if(useSeparateCubePruningStatesForMatchingSubstitutions()){
-            bestState = (CubePruneStateBase<T>) 
-            CubePruneStateFuzzyMatching.createCubePruneStateFuzzyMatchingImprovedCubePruning(result, ranks, rules, currentTailNodes, 
-                (DotNodeMultiLabel) dotNode, bestRule, useFixedRuleMatchingNonterminalsFlags);  
-      }
-      else{        
-          bestState = (CubePruneStateBase<T>) 
-          CubePruneStateFuzzyMatching.createCubePruneStateFuzzyMatchingStandard(result, ranks, rules, currentTailNodes,
-          (DotNodeMultiLabel)dotNode);
-      }
+    if(peformFuzzyMatching()){   
+       bestState = (CubePruneStateBase<T>) 
+       CubePruneStateFuzzyMatching.createCubePruneStateFuzzyMatchingImprovedCubePruning(result, ranks, rules, currentTailNodes, (DotNodeMultiLabel) dotNode, validAntNodeComputers);
     }
     
     else{
@@ -472,21 +490,35 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
     candidates.add(bestState);
   }
   
-  
   @SuppressWarnings("unchecked")
   private void addNewCandidateGlueRule(int i, int j, PriorityQueue<CubePruneStateBase<T>> candidates,
     List<Rule> rules,Rule bestRule,SourcePath sourcePath,DotNodeMultiLabel dotNode, SuperNode selectedSuperNodeSecondGlueRuleNonterminal){
+    List<ValidAntNodeComputer<DotNodeMultiLabel>> validAntNodeComputers =  ValidAntNodeComputerFuzzyMatchingFixedLabel.createValidAntNodeComputersImprovedCubePruningFuzzyMatchingGlueRule(dotNode, bestRule, selectedSuperNodeSecondGlueRuleNonterminal);
+    addNewCandidateRule(i, j, candidates, rules, bestRule, sourcePath, dotNode, validAntNodeComputers);
+  }
+
+  @SuppressWarnings("unchecked")
+  private void addNewCandidateForSelectedSuperNodes(int i, int j, PriorityQueue<CubePruneStateBase<T>> candidates,
+    List<Rule> rules,Rule bestRule,SourcePath sourcePath,DotNodeMultiLabel dotNode, List<SuperNode> selectedSuperNodes){
+    List<ValidAntNodeComputer<DotNodeMultiLabel>> validAntNodeComputers =  ValidAntNodeComputerFuzzyMatchingFixedLabel.createValidAntNodeComputersSelectedSuperNodes(dotNode, bestRule, selectedSuperNodes);
+    addNewCandidateRule(i, j, candidates, rules, bestRule, sourcePath, dotNode, validAntNodeComputers);
+  }
+  
+  
+  @SuppressWarnings("unchecked")
+  private void addNewCandidateRule(int i, int j, PriorityQueue<CubePruneStateBase<T>> candidates,
+    List<Rule> rules,Rule bestRule,SourcePath sourcePath,DotNodeMultiLabel dotNode, List<ValidAntNodeComputer<DotNodeMultiLabel>> validAntNodeComputers){
   
     int[] ranks = new int[1 + dotNode.getAntSuperNodes().size()];
     Arrays.fill(ranks, 1);
-    List<HGNode> currentTailNodes = getCurrentTailNodesForDotNodeGlueRule(dotNode, ranks, this, bestRule, selectedSuperNodeSecondGlueRuleNonterminal);
+    List<HGNode> currentTailNodes = getCurrentTailNodesForDotNode(ranks, this, validAntNodeComputers);
   
     ComputeNodeResult result = new ComputeNodeResult(featureFunctions, bestRule,
         currentTailNodes, i, j, sourcePath, sentence);
     CubePruneStateBase<T> bestState = null; 
 
     bestState = (CubePruneStateBase<T>) 
-    CubePruneStateFuzzyMatching.createCubePruneStateFuzzyMatchingImprovedCubePruningGlueRule(result, ranks, rules, currentTailNodes, dotNode, bestRule, selectedSuperNodeSecondGlueRuleNonterminal);
+    CubePruneStateFuzzyMatching.createCubePruneStateFuzzyMatchingImprovedCubePruning(result, ranks, rules, currentTailNodes, dotNode, validAntNodeComputers);
                           
     candidates.add(bestState);
   }
@@ -640,6 +672,10 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
   
   protected boolean exploreAllLabelsForGlueRulesInCubePruningInitialization() {
     return this.dotcharts[0].exploreAllLabelsForGlueRulesInCubePruningInitialization();
+  }
+  
+  protected boolean exploreAllPossibleLabelSubstitutionsForAllRulesInCubePruningInitialization() {
+    return this.dotcharts[0].exploreAllPossibleLabelSubstitutionsForAllRulesInCubePruningInitialization();
   }
   
   private static final <T> List<T> unpackFirstCombination(List<List<T>> listOfLists) {

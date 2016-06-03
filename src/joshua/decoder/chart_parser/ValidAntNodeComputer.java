@@ -91,6 +91,17 @@ public abstract class ValidAntNodeComputer<T extends DotNodeBase<?>> {
     return result;
   }
   
+  public static List<ValidAntNodeComputer<DotNodeMultiLabel>> createValidAntNodeComputersSelectedSuperNodes(DotNodeMultiLabel dotNode, Rule rule, List<SuperNode> selectedSuperNodeNonterminals){
+    List<ValidAntNodeComputer<DotNodeMultiLabel>> validAntNodeComputers = new ArrayList<ValidAntNodeComputer<DotNodeMultiLabel>>();
+   
+    for(int nonterminalIndex = 0; nonterminalIndex < selectedSuperNodeNonterminals.size(); nonterminalIndex++){
+      validAntNodeComputers.add(ValidAntNodeComputerFuzzyMatchingFixedLabel.createValidAntNodeComputerFuzzyMatchingFixedLabelSpecificSuperNode(dotNode, nonterminalIndex, selectedSuperNodeNonterminals.get(nonterminalIndex)));
+    }
+    
+    return validAntNodeComputers;
+  }
+  
+  
   public static List<ValidAntNodeComputer<DotNodeMultiLabel>> createValidAntNodeComputersImprovedCubePruningFuzzyMatchingGlueRule(DotNodeMultiLabel dotNode, Rule rule, SuperNode selectedSuperNodeSecondGlueRuleNonterminal){
 
     List<ValidAntNodeComputer<DotNodeMultiLabel>> validAntNodeComputers = new ArrayList<ValidAntNodeComputer<DotNodeMultiLabel>>();
@@ -144,8 +155,11 @@ public abstract class ValidAntNodeComputer<T extends DotNodeBase<?>> {
       int index = nextRanks[nonterminalIndex + 1] - 1;
       HGNode node = getAlternativesListNonterminal(chart).get(index);       
       if (acceptableLabelIndices.contains(node.lhs)) {
+        //System.err.println(">>>   findNextValidAntNodeAndUpdateRanks -- using HGNode at index " + index);
+        
         return node;
       } else {
+        //System.err.println(">>>   findNextValidAntNodeAndUpdateRanks -- not contained in acceptable indices, skip");
         nextRanks[nonterminalIndex + 1]++;
       }
     }

@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Set;
 
 import joshua.corpus.Vocabulary;
+import joshua.decoder.chart_parser.DotChart.DotNodeBase;
 import joshua.decoder.chart_parser.DotChart.DotNodeMultiLabel;
 import joshua.decoder.chart_parser.ValidAntNodeComputer.ValidAntNodeComputerFuzzyMatching;
 import joshua.decoder.chart_parser.ValidAntNodeComputer.ValidAntNodeComputerFuzzyMatchingFixedLabel;
@@ -21,26 +22,11 @@ public class CubePruneStateFuzzyMatching extends CubePruneStateBase<DotNodeMulti
     // assertValidAntNodes();
   }
 
-  public static CubePruneStateFuzzyMatching createCubePruneStateFuzzyMatchingStandard(
-      ComputeNodeResult score, int[] ranks, List<Rule> rules, List<HGNode> antecedents,
-      DotNodeMultiLabel dotNode) {
-    return new CubePruneStateFuzzyMatching(score, ranks, rules, antecedents, dotNode,
-        ValidAntNodeComputer.createValidAntNodeComputersStandardFuzzyMatching(dotNode));
-  }
-
   public static CubePruneStateFuzzyMatching createCubePruneStateFuzzyMatchingImprovedCubePruning(
       ComputeNodeResult score, int[] ranks, List<Rule> rules, List<HGNode> antecedents,
-      DotNodeMultiLabel dotNode, Rule rule, List<Boolean> useFixedRuleMatchingNonterminalsFlags) {
+      DotNodeMultiLabel dotNode, List<ValidAntNodeComputer<DotNodeMultiLabel>> validAntNodeComputers) {
     return new CubePruneStateFuzzyMatching(score, ranks, rules, antecedents, dotNode,
-        ValidAntNodeComputer.createValidAntNodeComputersImprovedCubePruningFuzzyMatching(dotNode,
-            rule, useFixedRuleMatchingNonterminalsFlags));
-  }
-
-  public static CubePruneStateFuzzyMatching createCubePruneStateFuzzyMatchingImprovedCubePruningGlueRule(
-      ComputeNodeResult score, int[] ranks, List<Rule> rules, List<HGNode> antecedents,
-      DotNodeMultiLabel dotNode, Rule rule, SuperNode selectedSuperNodeSecondGlueRuleNonterminal) {
-    return new CubePruneStateFuzzyMatching(score, ranks, rules, antecedents, dotNode,
-      ValidAntNodeComputerFuzzyMatchingFixedLabel.createValidAntNodeComputersImprovedCubePruningFuzzyMatchingGlueRule(dotNode, rule, selectedSuperNodeSecondGlueRuleNonterminal));
+      validAntNodeComputers);
   }
   
   public static boolean superNodeMatchesRuleNonterminal(SuperNode superNode,

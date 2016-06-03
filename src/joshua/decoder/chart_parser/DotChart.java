@@ -436,6 +436,10 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
     return nonTerminalMatcher.exploreAllLabelsForGlueRulesInCubePruningInitialization();
   }
   
+  protected boolean exploreAllPossibleLabelSubstitutionsForAllRulesInCubePruningInitialization() {
+    return nonTerminalMatcher.exploreAllPossibleLabelSubstitutionsForAllRulesInCubePruningInitialization();
+  }
+  
   // ===============================================================
   // Package-protected classes
   // ===============================================================
