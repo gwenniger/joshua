@@ -1383,7 +1383,13 @@ sub sanity_check_order_of_lambdas {
 
   my @expected_lambdas = @{$featlist->{"names"}};
   my @got = get_order_of_scores_from_nbestlist($filename_or_stream);
-  push @got, "OOV_Penalty";  ### Gideon add OOV_Penalty which is recognized as sparse feature and not returned by @got but included in @expected_lambdas
+  
+  my %expected_lambdas_map = map { $_ => 1 } @expected_lambdas; 
+  if(exists($expected_lambdas_map{"OOV_Penalty"})) {  
+   # When we decode with sparse features, the OOV penalty will not be in the expected lambdas array, to avoid double OOV features 
+   push @got, "OOV_Penalty";  ### Gideon add OOV_Penalty which is recognized as sparse feature and not returned by @got but typically included in @expected_lambdas (unless sparse features are used)
+  }
+
   die "Mismatched lambdas. Decoder returned @got, we expected @expected_lambdas"
     if "@got" ne "@expected_lambdas";
 }

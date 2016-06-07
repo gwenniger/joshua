@@ -8,13 +8,11 @@ import java.io.FileNotFoundException;
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
-
 import joshua.corpus.Vocabulary;
 import joshua.decoder.ff.FeatureVector;
 import joshua.decoder.JoshuaConfiguration.INPUT_TYPE;
@@ -655,13 +653,19 @@ public class Decoder {
       //  this.determineLabelSubstitutionFeatureValuePredictor();  
       //}
       
-
+      
       // This is mostly for compatibility with the Moses tuning script
       if (joshuaConfiguration.show_weights_and_quit) {
         for (int i = 0; i < FeatureVector.DENSE_FEATURE_NAMES.size(); i++) {
           String name = FeatureVector.DENSE_FEATURE_NAMES.get(i);
           if (joshuaConfiguration.moses) {
-              System.out.println(String.format("%s= %.5f", mosesize(name), weights.getDense(i)));
+            
+              // The OOV penalty should only be reported as a dense feature if it is the 
+              //only dense feature, for compatibility with moses mira tuning
+              // OOV penalty joins the sparse features if there are others
+              if((!usesSparseFeaturesBesidesOOV() || (!name.equals(("OOVPenalty"))))){
+                System.out.println(String.format("%s= %.5f", mosesize(name), weights.getDense(i)));
+              } 
           }  
           else{
             System.out.println(String.format("%s %.5f", name, weights.getDense(i)));
@@ -697,7 +701,24 @@ public class Decoder {
 
     return this;
   }
-
+  
+  /**
+   * TODO: How to generically check if there are sparse features besides OVV?
+   * 
+   * We need to know if there are more sparse features besides OOV (now or in the future)
+   * If so we should not report the OOV feature in the joshuaConfiguration.show_weights_and_quit
+   * block, to avoid that there will be an OOV feature in both the sparse feature file and the 
+   * dense feature file
+   * If however, there are no other sparse features, OOV should be used with the dense features
+   * for purpose of mira compatibility
+   * @return
+   */
+  public boolean usesSparseFeaturesBesidesOOV(){
+    return joshuaConfiguration.fuzzy_matching;
+  }
+  
+  
+  
   /**
    * Initializes translation grammars Retained for backward compatibility
    * 
@@ -882,6 +903,8 @@ public class Decoder {
           feature = demoses(feature);
         }
 
+        
+      
         weights.increment(feature, value);
       }
     } catch (FileNotFoundException ioe) {
