@@ -2,7 +2,9 @@ package joshua.decoder.chart_parser;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import joshua.corpus.Vocabulary;
 import joshua.decoder.chart_parser.DotChart.DotNode;
@@ -127,7 +129,7 @@ public abstract class ValidAntNodeComputer<T extends DotNodeBase<?>> {
   public abstract List<HGNode> getAlternativesListNonterminal(Chart<?, ?> chart);
 
   /**
-   * This method returns a list of keys corresponding to acceptable label indices for the
+   * This method returns a set of keys corresponding to acceptable label indices for the
    * nonterminal index. This is needed in fuzzy matching, because there rather than working with the
    * sorted list of HGNodes grouped by SuperNodes - which automatically guarantees acceptability -
    * we instead work with the one level higher list of all sorted HGNodes present in the cell for
@@ -136,14 +138,15 @@ public abstract class ValidAntNodeComputer<T extends DotNodeBase<?>> {
    * This method can then be used to check whether a specific HGNode has one of the acceptable label
    * choices for the next choice for a nonterminal, or doesn't and hence should be skipped over.
    * 
+   * We use a (hash) set instead of a list, to allow efficient checking of set containment.
    * @param nonterminalIndex
    * @return
    */
-  public abstract List<Integer> getAcceptableLabelIndicesNonterminal();
+  public abstract Set<Integer> getAcceptableLabelIndicesNonterminal();
 
   public HGNode findNextValidAntNodeAndUpdateRanks(int[] nextRanks, Chart<?, ?> chart) {
     // nextAntNodes.add(superNodes.get(x).nodes.get(nextRanks[x + 1] - 1));
-    List<Integer> acceptableLabelIndices = getAcceptableLabelIndicesNonterminal();
+    Set<Integer> acceptableLabelIndices = getAcceptableLabelIndicesNonterminal();
     // System.err.println("Gideon: acceptableLabelIndices: " + acceptableLabelIndices);
 
     int numAlternatives = getAlternativesListNonterminal(chart).size();
@@ -178,8 +181,8 @@ public abstract class ValidAntNodeComputer<T extends DotNodeBase<?>> {
     }
 
     @Override
-    public List<Integer> getAcceptableLabelIndicesNonterminal() {
-      return Collections.singletonList(this.dotNode.getAntSuperNodes().get(nonterminalIndex).lhs);
+    public Set<Integer> getAcceptableLabelIndicesNonterminal() {
+      return Collections.singleton(this.dotNode.getAntSuperNodes().get(nonterminalIndex).lhs);
     }
   }
 
@@ -230,8 +233,8 @@ public abstract class ValidAntNodeComputer<T extends DotNodeBase<?>> {
     }
 
     @Override
-    public List<Integer> getAcceptableLabelIndicesNonterminal() {
-      return Collections.singletonList(matchingLabelSuperNode.lhs);
+    public Set<Integer> getAcceptableLabelIndicesNonterminal() {
+      return Collections.singleton(matchingLabelSuperNode.lhs);
     }
 
   }
@@ -241,17 +244,19 @@ public abstract class ValidAntNodeComputer<T extends DotNodeBase<?>> {
 
     // We save the acceptable labels for nonterminals, so that we don't have to recompute these all
     // the time
-    private final List<Integer> acceptableLabelIndicesNonterminal;
+    // We use a HashSet as opposed to generic set, to assure that the contains method has 
+    // O(1) complexity.
+    private final HashSet<Integer> acceptableLabelIndicesNonterminal;
 
     protected ValidAntNodeComputerFuzzyMatching(DotNodeMultiLabel dotNode, int nonterminalIndex,
-        List<Integer> acceptableLabelIndicesNonterminal) {
+        HashSet<Integer> acceptableLabelIndicesNonterminal) {
       super(dotNode, nonterminalIndex);
       this.acceptableLabelIndicesNonterminal = acceptableLabelIndicesNonterminal;
     }
 
-    public static List<Integer> getAcceptableLabelIndicesNonterminalNotMatchingRuleLabel(
+    public static HashSet<Integer> getAcceptableLabelIndicesNonterminalNotMatchingRuleLabel(
         DotNodeMultiLabel dotNode, int nonterminalIndex, Rule rule) {
-      List<Integer> result = new ArrayList<Integer>();
+      HashSet<Integer> result = new HashSet<Integer>();
       for (SuperNode superNode : dotNode.getAntSuperNodes().get(nonterminalIndex)) {
         int key = superNode.lhs;
         if (!CubePruneStateFuzzyMatching.superNodeMatchesRuleNonterminal(superNode,
@@ -263,9 +268,9 @@ public abstract class ValidAntNodeComputer<T extends DotNodeBase<?>> {
       return result;
     }
 
-    public static List<Integer> getAcceptableLabelIndicesNonterminal(DotNodeMultiLabel dotNode,
+    public static HashSet<Integer> getAcceptableLabelIndicesNonterminal(DotNodeMultiLabel dotNode,
         int nonterminalIndex) {
-      List<Integer> result = new ArrayList<Integer>();
+      HashSet<Integer> result = new HashSet<Integer>();
       for (SuperNode superNode : dotNode.getAntSuperNodes().get(nonterminalIndex)) {
         result.add(superNode.lhs);
       }
@@ -286,7 +291,7 @@ public abstract class ValidAntNodeComputer<T extends DotNodeBase<?>> {
     }
 
     @Override
-    public List<Integer> getAcceptableLabelIndicesNonterminal() {
+    public Set<Integer> getAcceptableLabelIndicesNonterminal() {
       return this.acceptableLabelIndicesNonterminal;
     }
 

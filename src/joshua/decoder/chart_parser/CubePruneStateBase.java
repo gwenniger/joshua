@@ -3,6 +3,7 @@ package joshua.decoder.chart_parser;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 
 import joshua.decoder.hypergraph.HGNode;
 import joshua.decoder.ff.state_maintenance.DPState;
@@ -82,8 +83,8 @@ public abstract class CubePruneStateBase<T extends joshua.decoder.chart_parser.D
     // created possibly for the same DotNodeMultiLabel, but these states are distinguished 
     // by their ValidAntNodeComputers
     for(int i = 0 ; i < validAntNodeComputers.size(); i++){
-     List<Integer> acceptableLabelsThisNonterminalI =   this.validAntNodeComputers.get(i).getAcceptableLabelIndicesNonterminal();
-     List<Integer> acceptableLabelsStateNonterminalI =   state.validAntNodeComputers.get(i).getAcceptableLabelIndicesNonterminal();
+     Set<Integer> acceptableLabelsThisNonterminalI =   this.validAntNodeComputers.get(i).getAcceptableLabelIndicesNonterminal();
+     Set<Integer> acceptableLabelsStateNonterminalI =   state.validAntNodeComputers.get(i).getAcceptableLabelIndicesNonterminal();
      if(!acceptableLabelsThisNonterminalI.equals(acceptableLabelsStateNonterminalI)){
        return false;
      }
@@ -141,7 +142,7 @@ public abstract class CubePruneStateBase<T extends joshua.decoder.chart_parser.D
     return validAntNodeComputers.get(nonterminalIndex).getAlternativesListNonterminal(chart);
   }
   
-  public  List<Integer> getAcceptableLabelIndicesNonterminal(int nonterminalIndex){
+  public  Set<Integer> getAcceptableLabelIndicesNonterminal(int nonterminalIndex){
     return validAntNodeComputers.get(nonterminalIndex).getAcceptableLabelIndicesNonterminal();
   }
   

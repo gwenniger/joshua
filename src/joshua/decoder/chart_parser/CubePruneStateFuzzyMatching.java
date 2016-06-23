@@ -125,7 +125,7 @@ public class CubePruneStateFuzzyMatching extends CubePruneStateBase<DotNodeMulti
   }
 
   @Override
-  public List<Integer> getAcceptableLabelIndicesNonterminal(int nonterminalIndex) {
+  public Set<Integer> getAcceptableLabelIndicesNonterminal(int nonterminalIndex) {
     return validAntNodeComputers.get(nonterminalIndex).getAcceptableLabelIndicesNonterminal();
   }
 
