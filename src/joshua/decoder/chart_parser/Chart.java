@@ -17,6 +17,7 @@ import joshua.decoder.chart_parser.CubePruneStateBase;
 import joshua.decoder.chart_parser.DotChart.DotNode;
 import joshua.decoder.chart_parser.DotChart.DotNodeBase;
 import joshua.decoder.chart_parser.DotChart.DotNodeMultiLabel;
+import joshua.decoder.chart_parser.DotChart.SuperNodeAlternativesSpecification;
 import joshua.decoder.chart_parser.ValidAntNodeComputer.ValidAntNodeComputerBasic;
 import joshua.decoder.chart_parser.ValidAntNodeComputer.ValidAntNodeComputerFuzzyMatching;
 import joshua.decoder.chart_parser.ValidAntNodeComputer.ValidAntNodeComputerFuzzyMatchingFixedLabel;
@@ -271,7 +272,14 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
             }         
             
             @SuppressWarnings("unchecked")
-            List<List<SuperNode>> superNodes = (List<List<SuperNode>>) dotNode.getAntSuperNodes();
+            
+            List<SuperNodeAlternativesSpecification> superNodeAlterNativeSpecifiactions = (List<SuperNodeAlternativesSpecification>) dotNode.getAntSuperNodes();
+            
+            List<List<SuperNode>> superNodes = new ArrayList<List<SuperNode>>();
+            for(SuperNodeAlternativesSpecification superNodeAlternativesSpecification : superNodeAlterNativeSpecifiactions){
+              superNodes.add(superNodeAlternativesSpecification.getAlternativeSuperNodes());
+            }           
+            
             //Assert.assertFalse(superNodes.isEmpty());
             //logger.info("superNodes.get(0).size();" +superNodes.get(0).size()); 
             
@@ -388,11 +396,16 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
       throw new RuntimeException("Error: supposed to be glue rule has wrong number of left hand side nonterminals");
     }
     
-    if(dotNodeMultiLabel.getAntSuperNodes().get(0).size() != 1){
-      throw new RuntimeException("Error: supposed to be glue rule has wrong number of alternatives for first label, should have only one alternative");
-    }
+   // if(dotNodeMultiLabel.getAntSuperNodes().get(0).size() != 1){
+   //   throw new RuntimeException("Error: supposed to be glue rule has wrong number of alternatives for first label, should have only one alternative");
+   // }
     
-    for(SuperNode selectedSuperNodeSecondGlueRuleNonterminal : dotNodeMultiLabel.getAntSuperNodes().get(1)){
+    SuperNodeAlternativesSpecification superNodeAlternativesSpecification = dotNodeMultiLabel.getAntSuperNodes().get(1);
+    superNodeAlternativesSpecification.throwRuntimeExceptionIfNotDescribingAcceptableSuperNodes("Chart.addSeparateGlueRuleCandidatesForEachSubstitutedToLabel");
+   
+    List<SuperNode> alternativeSuperNodes = superNodeAlternativesSpecification.getAlternativeSuperNodes();
+    
+    for(SuperNode selectedSuperNodeSecondGlueRuleNonterminal : alternativeSuperNodes){
       //Assert.assertTrue(fixedRuleMatchingNonterminalsFlagsAlternative.size() > 0);
      // System.err.println(">>>> Gideon: Adding glue rule candidate for label " + Vocabulary.word(selectedSuperNodeSecondGlueRuleNonterminal.lhs));
       addNewCandidateGlueRule(i, j, candidates, rules, bestRule, sourcePath, dotNodeMultiLabel, selectedSuperNodeSecondGlueRuleNonterminal);

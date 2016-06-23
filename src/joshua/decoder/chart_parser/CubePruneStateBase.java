@@ -83,12 +83,14 @@ public abstract class CubePruneStateBase<T extends joshua.decoder.chart_parser.D
     // created possibly for the same DotNodeMultiLabel, but these states are distinguished 
     // by their ValidAntNodeComputers
     for(int i = 0 ; i < validAntNodeComputers.size(); i++){
-     Set<Integer> acceptableLabelsThisNonterminalI =   this.validAntNodeComputers.get(i).getAcceptableLabelIndicesNonterminal();
-     Set<Integer> acceptableLabelsStateNonterminalI =   state.validAntNodeComputers.get(i).getAcceptableLabelIndicesNonterminal();
+     Set<Integer> acceptableLabelsThisNonterminalI =   this.validAntNodeComputers.get(i).getAcceptableOrForbiddenLabelIndicesNonterminal();
+     Set<Integer> acceptableLabelsStateNonterminalI =   state.validAntNodeComputers.get(i).getAcceptableOrForbiddenLabelIndicesNonterminal();
      if(!acceptableLabelsThisNonterminalI.equals(acceptableLabelsStateNonterminalI)){
        return false;
      }
-    
+     if(!this.validAntNodeComputers.get(i).labelIndicesNonterminalListsAcceptableIndices() == 
+         state.validAntNodeComputers.get(i).labelIndicesNonterminalListsAcceptableIndices())
+       return false;
     }
 
     return true;
@@ -106,7 +108,7 @@ public abstract class CubePruneStateBase<T extends joshua.decoder.chart_parser.D
     int prime = 31;
     int hash = 1;
     for(ValidAntNodeComputer<?>  validAntNodeComputer: validAntNodeComputers){
-      hash = hash * prime + validAntNodeComputer.getAcceptableLabelIndicesNonterminal().hashCode();
+      hash = hash * prime + validAntNodeComputer.getAcceptableOrForbiddenLabelIndicesNonterminal().hashCode();
     }
     return hash;
   }
@@ -140,10 +142,6 @@ public abstract class CubePruneStateBase<T extends joshua.decoder.chart_parser.D
  
   public  List<HGNode> getAlternativesListNonterminal(int nonterminalIndex, Chart<?,?> chart){
     return validAntNodeComputers.get(nonterminalIndex).getAlternativesListNonterminal(chart);
-  }
-  
-  public  Set<Integer> getAcceptableLabelIndicesNonterminal(int nonterminalIndex){
-    return validAntNodeComputers.get(nonterminalIndex).getAcceptableLabelIndicesNonterminal();
   }
   
   public List<ValidAntNodeComputer<T>> getValidAntNodeComputers(){

@@ -10,6 +10,7 @@ import joshua.corpus.Vocabulary;
 import joshua.decoder.chart_parser.DotChart.DotNode;
 import joshua.decoder.chart_parser.DotChart.DotNodeBase;
 import joshua.decoder.chart_parser.DotChart.DotNodeMultiLabel;
+import joshua.decoder.chart_parser.DotChart.SuperNodeAlternativesSpecification;
 import joshua.decoder.ff.tm.Rule;
 import joshua.decoder.hypergraph.HGNode;
 
@@ -47,18 +48,26 @@ public abstract class ValidAntNodeComputer<T extends DotNodeBase<?>> {
     return new ValidAntNodeComputerBasic(dotNode, nonterminalIndex);
   }
 
+  public static boolean  describesAcceptableSuperNodes(DotNodeMultiLabel dotNode,int nonterminalIndex){
+    return dotNode.getAntSuperNodes().get(nonterminalIndex).describesAcceptableSuperNodes();
+  }
+  
+  
   public static ValidAntNodeComputerFuzzyMatching createValidAntNodeComputerFuzzyMatching(
       DotNodeMultiLabel dotNode, int nonterminalIndex) {
+    
+    
+    
     return new ValidAntNodeComputerFuzzyMatching(dotNode, nonterminalIndex,
-        ValidAntNodeComputerFuzzyMatching.getAcceptableLabelIndicesNonterminal(dotNode,
-            nonterminalIndex));
+        ValidAntNodeComputerFuzzyMatching.getAcceptableOrForbiddenLabelIndicesNonterminal(dotNode,
+            nonterminalIndex),describesAcceptableSuperNodes(dotNode, nonterminalIndex));
   }
 
   public static ValidAntNodeComputerFuzzyMatching createValidAntNodeComputerFuzzyMatchingNotMatchingRuleLabel(
       DotNodeMultiLabel dotNode, int nonterminalIndex, Rule rule) {
     return new ValidAntNodeComputerFuzzyMatching(dotNode, nonterminalIndex,
         ValidAntNodeComputerFuzzyMatching.getAcceptableLabelIndicesNonterminalNotMatchingRuleLabel(
-            dotNode, nonterminalIndex, rule));
+            dotNode, nonterminalIndex, rule),describesAcceptableSuperNodes(dotNode, nonterminalIndex));
   }
 
   
@@ -142,11 +151,33 @@ public abstract class ValidAntNodeComputer<T extends DotNodeBase<?>> {
    * @param nonterminalIndex
    * @return
    */
-  public abstract Set<Integer> getAcceptableLabelIndicesNonterminal();
+  public abstract Set<Integer> getAcceptableOrForbiddenLabelIndicesNonterminal();
+  
+  public abstract boolean labelIndicesNonterminalListsAcceptableIndices();
 
+  
+  /**
+   * Method that checks whether a label index is acceptable. If we are keeping a set of 
+   * acceptable indices, the index should be contained. If on the other hand 
+   * we are keeping a set of forbidden indices instead, anything not 
+   * contained in that list is acceptable, and the index should be not contained.
+   * 
+   * @param labelIndex
+   * @return
+   */
+  public boolean isAcceptalbeLabelIndex(Integer labelIndex){
+    if(labelIndicesNonterminalListsAcceptableIndices()){
+      return getAcceptableOrForbiddenLabelIndicesNonterminal().contains(labelIndex);
+    }
+    else{
+      //System.err.println(">>>>>>> Gideon: Checking acceptability by matching against list of forbidden nonterminal indices");
+     return !getAcceptableOrForbiddenLabelIndicesNonterminal().contains(labelIndex); 
+    }
+  }
+  
   public HGNode findNextValidAntNodeAndUpdateRanks(int[] nextRanks, Chart<?, ?> chart) {
     // nextAntNodes.add(superNodes.get(x).nodes.get(nextRanks[x + 1] - 1));
-    Set<Integer> acceptableLabelIndices = getAcceptableLabelIndicesNonterminal();
+    
     // System.err.println("Gideon: acceptableLabelIndices: " + acceptableLabelIndices);
 
     int numAlternatives = getAlternativesListNonterminal(chart).size();
@@ -157,7 +188,7 @@ public abstract class ValidAntNodeComputer<T extends DotNodeBase<?>> {
     while (nextRanks[nonterminalIndex + 1] <= numAlternatives) {
       int index = nextRanks[nonterminalIndex + 1] - 1;
       HGNode node = getAlternativesListNonterminal(chart).get(index);       
-      if (acceptableLabelIndices.contains(node.lhs)) {
+      if (isAcceptalbeLabelIndex(node.lhs)) {
         //System.err.println(">>>   findNextValidAntNodeAndUpdateRanks -- using HGNode at index " + index);
         
         return node;
@@ -181,8 +212,13 @@ public abstract class ValidAntNodeComputer<T extends DotNodeBase<?>> {
     }
 
     @Override
-    public Set<Integer> getAcceptableLabelIndicesNonterminal() {
+    public Set<Integer> getAcceptableOrForbiddenLabelIndicesNonterminal() {
       return Collections.singleton(this.dotNode.getAntSuperNodes().get(nonterminalIndex).lhs);
+    }
+
+    @Override
+    public boolean labelIndicesNonterminalListsAcceptableIndices() {
+      return true;
     }
   }
 
@@ -215,8 +251,11 @@ public abstract class ValidAntNodeComputer<T extends DotNodeBase<?>> {
     public static SuperNode getSuperNodeMatchingRuleGapLabel(Rule rule,
         DotNodeMultiLabel dotNodeMultiLabel, int nonterminalIndex) {
       SuperNode result = null;
-      List<SuperNode> superNodeAlternativesList = dotNodeMultiLabel.getAntSuperNodes().get(
+      
+      SuperNodeAlternativesSpecification superNodeAlternativesSpecification = dotNodeMultiLabel.getAntSuperNodes().get(
           nonterminalIndex);
+      superNodeAlternativesSpecification.throwRuntimeExceptionIfNotDescribingAcceptableSuperNodes("ValidAntNodeComputer. getSuperNodeMatchingRuleGapLabel");
+      List<SuperNode> superNodeAlternativesList = superNodeAlternativesSpecification.getAlternativeSuperNodes();
       for (SuperNode superNodeAlternative : superNodeAlternativesList) {
         if (CubePruneStateFuzzyMatching.superNodeMatchesRuleNonterminal(superNodeAlternative, rule, nonterminalIndex)) {
           result = superNodeAlternative;
@@ -233,8 +272,13 @@ public abstract class ValidAntNodeComputer<T extends DotNodeBase<?>> {
     }
 
     @Override
-    public Set<Integer> getAcceptableLabelIndicesNonterminal() {
+    public Set<Integer> getAcceptableOrForbiddenLabelIndicesNonterminal() {
       return Collections.singleton(matchingLabelSuperNode.lhs);
+    }
+
+    @Override
+    public boolean labelIndicesNonterminalListsAcceptableIndices() {
+      return true;
     }
 
   }
@@ -246,18 +290,27 @@ public abstract class ValidAntNodeComputer<T extends DotNodeBase<?>> {
     // the time
     // We use a HashSet as opposed to generic set, to assure that the contains method has 
     // O(1) complexity.
-    private final HashSet<Integer> acceptableLabelIndicesNonterminal;
+    private final HashSet<Integer> acceptableOrForbiddenLabelIndicesNonterminal;
 
+    private final boolean labelIndicesNonterminalListAcceptableIndices;
+    
     protected ValidAntNodeComputerFuzzyMatching(DotNodeMultiLabel dotNode, int nonterminalIndex,
-        HashSet<Integer> acceptableLabelIndicesNonterminal) {
+        HashSet<Integer> acceptableOrForbiddenLabelIndicesNonterminal,boolean labelIndicesNonterminalListsAcceptableIndices) {
       super(dotNode, nonterminalIndex);
-      this.acceptableLabelIndicesNonterminal = acceptableLabelIndicesNonterminal;
+      this.acceptableOrForbiddenLabelIndicesNonterminal = acceptableOrForbiddenLabelIndicesNonterminal;
+      this.labelIndicesNonterminalListAcceptableIndices = labelIndicesNonterminalListsAcceptableIndices;
     }
 
     public static HashSet<Integer> getAcceptableLabelIndicesNonterminalNotMatchingRuleLabel(
         DotNodeMultiLabel dotNode, int nonterminalIndex, Rule rule) {
       HashSet<Integer> result = new HashSet<Integer>();
-      for (SuperNode superNode : dotNode.getAntSuperNodes().get(nonterminalIndex)) {
+      
+      SuperNodeAlternativesSpecification superNodeAlternativesSpecification = dotNode.getAntSuperNodes().get(
+          nonterminalIndex);
+      superNodeAlternativesSpecification.throwRuntimeExceptionIfNotDescribingAcceptableSuperNodes("ValidAntNodeComputer.getAcceptableLabelIndicesNonterminalNotMatchingRuleLabel");
+      List<SuperNode> superNodeAlternativesList = superNodeAlternativesSpecification.getAlternativeSuperNodes();
+      
+      for (SuperNode superNode : superNodeAlternativesList) {
         int key = superNode.lhs;
         if (!CubePruneStateFuzzyMatching.superNodeMatchesRuleNonterminal(superNode,
             rule, nonterminalIndex)) {
@@ -268,10 +321,10 @@ public abstract class ValidAntNodeComputer<T extends DotNodeBase<?>> {
       return result;
     }
 
-    public static HashSet<Integer> getAcceptableLabelIndicesNonterminal(DotNodeMultiLabel dotNode,
+    public static HashSet<Integer> getAcceptableOrForbiddenLabelIndicesNonterminal(DotNodeMultiLabel dotNode,
         int nonterminalIndex) {
       HashSet<Integer> result = new HashSet<Integer>();
-      for (SuperNode superNode : dotNode.getAntSuperNodes().get(nonterminalIndex)) {
+      for (SuperNode superNode : dotNode.getAntSuperNodes().get(nonterminalIndex).getAlternativeSuperNodes()) {
         result.add(superNode.lhs);
       }
       return result;
@@ -279,7 +332,7 @@ public abstract class ValidAntNodeComputer<T extends DotNodeBase<?>> {
 
     @Override
     public List<HGNode> getAlternativesListNonterminal(Chart<?, ?> chart) {
-      SuperNode firstSuperNodeForIndex = dotNode.getAntSuperNodes().get(nonterminalIndex).get(0);
+      SuperNode firstSuperNodeForIndex = dotNode.getAntSuperNodes().get(nonterminalIndex).getRepresentingSuperNode();
       HGNode firstNodeForSuperNode = firstSuperNodeForIndex.nodes.get(0);
       int i = firstNodeForSuperNode.i;
       int j = firstNodeForSuperNode.j;
@@ -291,8 +344,13 @@ public abstract class ValidAntNodeComputer<T extends DotNodeBase<?>> {
     }
 
     @Override
-    public Set<Integer> getAcceptableLabelIndicesNonterminal() {
-      return this.acceptableLabelIndicesNonterminal;
+    public Set<Integer> getAcceptableOrForbiddenLabelIndicesNonterminal() {
+      return this.acceptableOrForbiddenLabelIndicesNonterminal;
+    }
+
+    @Override
+    public boolean labelIndicesNonterminalListsAcceptableIndices() {
+      return this.labelIndicesNonterminalListAcceptableIndices;
     }
 
   }

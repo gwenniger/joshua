@@ -6,7 +6,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
 import org.junit.Assert;
+
 import joshua.corpus.Vocabulary;
 import joshua.decoder.chart_parser.DotNodeTypeCreater.DotNodeCreater;
 import joshua.decoder.ff.tm.Grammar;
@@ -265,9 +267,13 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
         .getSortedSuperItems().values());
     
     List<SuperNode> oovAndGoalSymbolSuperNodes = nonTerminalMatcher.getOOAndGoalLabelSuperNodeSubList(superNodes);
-    List<SuperNode> neitherOOVNorGoalSymbolSuperNodes = nonTerminalMatcher.getNeitherOOVNorGoalLabelSuperNodeSubList(superNodes);
+    SuperNode firstNeitherOOVNorGoalSymbolSuperNode = nonTerminalMatcher.getFirstNeitherOOVNorGoalLabelSuperNode(superNodes);
     
-    
+    List<SuperNode> neitherOOVNorGoalSymbolSuperNodes = null;
+    // We only compete the neitherOOVNorGoalSymbolSuperNodes if they are needed, because computation is relatively expensive
+    if(nonTerminalMatcher.performFuzzyMatchingWithRefinedStateExploration()){
+      neitherOOVNorGoalSymbolSuperNodes = nonTerminalMatcher.getNeitherOOVNorGoalLabelSuperNodeSubList(superNodes);
+    }
 
     /* For every partially complete item over (i,k) */
     for (T dotNode : dotcells.get(i, k).dotNodes) {
@@ -278,8 +284,27 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
       // Assert.assertTrue(arcWord.startsWith("["));     
       
       if(nonTerminalMatcher.performFuzzyMatching()){
+        
+        // Here it does not really matter what supernode we use, since no matching is enforced, so we use the first
+        
+        
+                
+        
+        
+        SuperNodeAlternativesSpecification superNodesAlternativesSpecification = null;
+        
+        if(nonTerminalMatcher.performFuzzyMatchingWithRefinedStateExploration()){
+          superNodesAlternativesSpecification =
+              new SuperNodeAlternativesSpecification(neitherOOVNorGoalSymbolSuperNodes,firstNeitherOOVNorGoalSymbolSuperNode,false);  
+        }
+        else{
+          superNodesAlternativesSpecification =
+            new SuperNodeAlternativesSpecification(oovAndGoalSymbolSuperNodes,firstNeitherOOVNorGoalSymbolSuperNode,true);
+        }        
+        
         //logger.info(" addEfficientMultiLabelDotItemsFuzzyMatching (1a)");
-        addEfficientMultiLabelDotItemsFuzzyMatching(i, j, neitherOOVNorGoalSymbolSuperNodes, dotNode, skipUnary);
+        addEfficientMultiLabelDotItemsFuzzyMatching(i, j, superNodesAlternativesSpecification,firstNeitherOOVNorGoalSymbolSuperNode,
+            dotNode, skipUnary);
       }else{
         addDotItemsBasic(i, j, neitherOOVNorGoalSymbolSuperNodes, dotNode, skipUnary);
         //logger.info("  addDotItemsBasic(i, j, neitherOOVNorGoalSymbolSuperNodes, dotNode, skipUnary) (1b)");
@@ -293,22 +318,21 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
   
   
   @SuppressWarnings("unchecked")
-  private void addEfficientMultiLabelDotItemsFuzzyMatching(int i, int j,List<SuperNode> neitherOOVNorGoalSymbolSuperNodes,T dotNode, boolean skipUnary){
+  private void addEfficientMultiLabelDotItemsFuzzyMatching(int i, int j,SuperNodeAlternativesSpecification superNodesAlternativesSpecification,
+      SuperNode firstNeitherOOVNorGoalSuperNode, T dotNode, boolean skipUnary){
     /* For every completed nonterminal in the main chart */
     
-    if(neitherOOVNorGoalSymbolSuperNodes.isEmpty()){
-      //logger.info("Gideon:  neitherOOVNorGoalSymbolSuperNodes.isEmpty() :(");
+    if(firstNeitherOOVNorGoalSuperNode == null){
+      //logger.info("Gideon:  firstNeitherOOVNorGoalSuperNode == null :(");
       return;
-    }
-    // Here it does not really matter what supernode we use, since no matching is enforced, so we use the first 
-      SuperNode firstSuperNode = neitherOOVNorGoalSymbolSuperNodes.get(0); 
+    } 
 
       List<Trie> child_tnodes = nonTerminalMatcher.produceMatchingChildTNodesNonterminalLevel(
-          dotNode, firstSuperNode);
+          dotNode, firstNeitherOOVNorGoalSuperNode);
 
 
       if (!child_tnodes.isEmpty()) {
-
+        
 
         //logger.info("Gideon: looping over childe_tnodes");
         for (Trie child_tnode : child_tnodes) {
@@ -316,7 +340,7 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
             if ((!skipUnary) || (child_tnode.hasExtensions())) {
               
               //logger.info("Gideon: addDotItem for nonterminal!!!");
-              addDotItem(child_tnode, i, j, dotNode.getAntSuperNodes(), (T2) neitherOOVNorGoalSymbolSuperNodes, dotNode
+              addDotItem(child_tnode, i, j, dotNode.getAntSuperNodes(), (T2) superNodesAlternativesSpecification, dotNode
                   .getSourcePath().extendNonTerminal());
             }
 
@@ -597,18 +621,61 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
    * with fuzzy matching, compactly storing many DotItems that are identical,
    * except for their labels
    */
-  static class DotNodeMultiLabel extends DotNodeBase<List<SuperNode>>{    
+  static class DotNodeMultiLabel extends DotNodeBase<SuperNodeAlternativesSpecification>{    
     
-    public DotNodeMultiLabel(int i, int j, Trie trieNode, List<List<SuperNode>> antSuperNodeLists, SourcePath srcPath) {
+    public DotNodeMultiLabel(int i, int j, Trie trieNode, List<SuperNodeAlternativesSpecification> antSuperNodeLists, SourcePath srcPath) {
       super(i,j,trieNode,srcPath);
       this.antSuperNodes = antSuperNodeLists;
     }
 
     @Override
-    public List<List<SuperNode>> getAntSuperNodes() {
+    public List<SuperNodeAlternativesSpecification> getAntSuperNodes() {
       return antSuperNodes;
     }
     
   }
+
+  
+  
+  
+  static class SuperNodeAlternativesSpecification{
+    final List<SuperNode> alternativeAcceptableOrForbiddenSuperNodes;
+ // We need this extra SuperNode, because the list of alternativeAcceptableOrForbiddenSuperNodes may be empty
+    private final SuperNode firstSuperNode;   
+    private final boolean describesForbiddenSuperNodes;
+    
+    public SuperNodeAlternativesSpecification(List<SuperNode> alternativeAcceptableOrForbiddenSuperNodes,SuperNode firstSuperNode, 
+        boolean describesForbiddenSuperNodes){
+      this.alternativeAcceptableOrForbiddenSuperNodes = alternativeAcceptableOrForbiddenSuperNodes;
+      this.firstSuperNode = firstSuperNode;
+      this.describesForbiddenSuperNodes = describesForbiddenSuperNodes;
+    }
+    
+    public List<SuperNode> getAlternativeSuperNodes(){
+      return this.alternativeAcceptableOrForbiddenSuperNodes;
+    }
+    
+    public boolean describesAcceptableSuperNodes(){
+      return !this.describesForbiddenSuperNodes;
+    }
+    
+    public boolean describesForbiddenSuperNodes(){
+      return describesForbiddenSuperNodes;
+    }
+    
+    public SuperNode getRepresentingSuperNode(){
+      return this.firstSuperNode;
+    }
+    
+    public void throwRuntimeExceptionIfNotDescribingAcceptableSuperNodes(String callingMethodName){
+      if(!describesAcceptableSuperNodes()){
+        throw new RuntimeException("Error: " + callingMethodName + " used with "
+            + "Dotnode containing SuperNodeAlternativesSpecification that does not describe acceptable supernodes");
+      }
+    }
+      
+  }
+
+    
 
 }

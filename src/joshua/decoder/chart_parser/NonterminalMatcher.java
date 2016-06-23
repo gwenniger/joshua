@@ -88,7 +88,7 @@ public abstract class NonterminalMatcher <T extends DotNodeBase> {
 
     if (joshuaConfiguration.fuzzy_matching) {
       DotNodeMultiLabelCreater  dotNodeMultiLabelCreater  = new  DotNodeMultiLabelCreater();
-      return new DotChart<DotNodeMultiLabel,List<SuperNode>>(inputLattice,grammar, theChart, (NonterminalMatcher<DotNodeMultiLabel>) nonterminalMatcher,dotNodeMultiLabelCreater, grammar.isRegexpGrammar());
+      return new DotChart<DotNodeMultiLabel, DotChart.SuperNodeAlternativesSpecification>(inputLattice,grammar, theChart, (NonterminalMatcher<DotNodeMultiLabel>) nonterminalMatcher,dotNodeMultiLabelCreater, grammar.isRegexpGrammar());
     } else {     
       DotNodeCreater dotNodeCreater =  new DotNodeCreater();
       return new DotChart<DotNode,SuperNode>(inputLattice,grammar, theChart, (NonterminalMatcher<DotNode>) nonterminalMatcher,dotNodeCreater, grammar.isRegexpGrammar());
@@ -118,7 +118,12 @@ public abstract class NonterminalMatcher <T extends DotNodeBase> {
   protected abstract boolean exploreAllPossibleLabelSubstitutionsForAllRulesInCubePruningInitialization();
   protected abstract boolean useSeparateCubePruningStatesForMatchingSubstitutions();
   protected abstract boolean exploreAllLabelsForGlueRulesInCubePruningInitialization();
-
+  
+  protected boolean performFuzzyMatchingWithRefinedStateExploration(){
+    return exploreAllLabelsForGlueRulesInCubePruningInitialization() || 
+        useSeparateCubePruningStatesForMatchingSubstitutions() || exploreAllPossibleLabelSubstitutionsForAllRulesInCubePruningInitialization();
+  }
+  
   private static boolean isNonterminal(int wordIndex) {
     return wordIndex < 0;
   }
@@ -170,6 +175,15 @@ public abstract class NonterminalMatcher <T extends DotNodeBase> {
       }
     }
     return result;
+  }
+
+  public SuperNode getFirstNeitherOOVNorGoalLabelSuperNode(List<SuperNode> superNodes){
+    for(SuperNode superNode : superNodes){
+      if(!isOOVLabelOrGoalLabel(Vocabulary.word(superNode.lhs), joshuaConfiguration)){
+        return superNode;
+      }
+    }
+    return null;
   }
   
   public static List<Trie> produceStandardMatchingChildTNodesNonterminalLevel(DotNode dotNode,

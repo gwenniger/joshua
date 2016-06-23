@@ -8,6 +8,7 @@ import java.util.Set;
 import joshua.corpus.Vocabulary;
 import joshua.decoder.chart_parser.DotChart.DotNodeBase;
 import joshua.decoder.chart_parser.DotChart.DotNodeMultiLabel;
+import joshua.decoder.chart_parser.DotChart.SuperNodeAlternativesSpecification;
 import joshua.decoder.chart_parser.ValidAntNodeComputer.ValidAntNodeComputerFuzzyMatching;
 import joshua.decoder.chart_parser.ValidAntNodeComputer.ValidAntNodeComputerFuzzyMatchingFixedLabel;
 import joshua.decoder.ff.tm.Rule;
@@ -48,8 +49,13 @@ public class CubePruneStateFuzzyMatching extends CubePruneStateBase<DotNodeMulti
   private static boolean hasMatchingSubstitutions(DotNodeMultiLabel dotNode, Rule rule,
       int nonterminalIndex) {
    
-
-    for (SuperNode superNode : dotNode.getAntSuperNodes().get(nonterminalIndex)) {   
+    SuperNodeAlternativesSpecification superNodeAlternativesSpecification = dotNode.getAntSuperNodes().get(nonterminalIndex);
+    if(!superNodeAlternativesSpecification.describesAcceptableSuperNodes()){
+      throw new RuntimeException("Error: hasMatchingSubstitutions used with "
+          + "Dotnode containing SuperNodeAlternativesSpecification that does not describe acceptable supernodes");
+    }
+    
+    for (SuperNode superNode : dotNode.getAntSuperNodes().get(nonterminalIndex).getAlternativeSuperNodes()) {   
       if (superNodeMatchesRuleNonterminal(superNode, rule, nonterminalIndex)) {
         //System.err.println("}}} MATCH!!!");
         return true;
@@ -60,7 +66,11 @@ public class CubePruneStateFuzzyMatching extends CubePruneStateBase<DotNodeMulti
 
   private static boolean hasNonMatchingSubstitutions(DotNodeMultiLabel dotNode, Rule rule,
       int nonterminalIndex) {
-    int numSuperNodes = dotNode.getAntSuperNodes().get(nonterminalIndex).size();
+    
+    SuperNodeAlternativesSpecification superNodeAlternativesSpecification = dotNode.getAntSuperNodes().get(nonterminalIndex);
+    superNodeAlternativesSpecification.throwRuntimeExceptionIfNotDescribingAcceptableSuperNodes("CubePruningStateFuzzyMatching.hasNonMatchingSubstitutions");
+    
+    int numSuperNodes = dotNode.getAntSuperNodes().get(nonterminalIndex).getAlternativeSuperNodes().size();
     return ((numSuperNodes > 1) || ((numSuperNodes > 0)
         && (!hasMatchingSubstitutions(dotNode, rule, nonterminalIndex))));
 
@@ -107,7 +117,7 @@ public class CubePruneStateFuzzyMatching extends CubePruneStateBase<DotNodeMulti
     for (int i = 0; i < length; i++) {
       HGNode antNode = this.antNodes.get(i);
       String antNodeLHS = Vocabulary.word(antNode.lhs);
-      List<SuperNode> superNodesList = this.dotNode.getAntSuperNodes().get(i);
+      List<SuperNode> superNodesList = this.dotNode.getAntSuperNodes().get(i).getAlternativeSuperNodes();
       Set<String> superNodeLHSSet = new HashSet<String>();
       for (SuperNode superNode : superNodesList) {
         superNodeLHSSet.add(Vocabulary.word(superNode.lhs));
@@ -123,10 +133,5 @@ public class CubePruneStateFuzzyMatching extends CubePruneStateBase<DotNodeMulti
   public List<HGNode> getAlternativesListNonterminal(int nonterminalIndex, Chart<?, ?> chart) {
     return validAntNodeComputers.get(nonterminalIndex).getAlternativesListNonterminal(chart);
   }
-
-  @Override
-  public Set<Integer> getAcceptableLabelIndicesNonterminal(int nonterminalIndex) {
-    return validAntNodeComputers.get(nonterminalIndex).getAcceptableLabelIndicesNonterminal();
-  }
-
+  
 }
