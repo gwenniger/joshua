@@ -57,22 +57,10 @@ public class LabelSubstitutionFF extends StatelessFF {
     return false;
   }
   
-  public static LabelSubstitutionBasicFF createStandardLabelSubstitutionFF(FeatureVector weights,
-      JoshuaConfiguration joshuaConfiguration) {
-    return new LabelSubstitutionBasicFF(weights, getFeatureNameStandardFeature(),
-        joshuaConfiguration, createNoSmoothingLabelSubstiontionSmoothersList());
-  }
-
   public static LabelSubstitutionSparseFF createStandardLabelSubstitutionSparseFF(
       FeatureVector weights, JoshuaConfiguration joshuaConfiguration) {
     return new LabelSubstitutionSparseFF(weights, getFeatureNameStandardSparseFeature(),
         joshuaConfiguration, createNoSmoothingLabelSubstiontionSmoothersList());
-  }
-
-  public static LabelSubstitutionBasicFF createLabelSubstitutionFFDoubleLabel(
-      FeatureVector weights, JoshuaConfiguration joshuaConfiguration) {
-    return new LabelSubstitutionBasicFF(weights, getFeatureNameStandardFeature(),
-        joshuaConfiguration, createDoubleLabelSmoothingLabelSubstiontionSmoothersList());
   }
 
   public static LabelSubstitutionSparseFF createLabelSubstitutionFFDoubleLabelSparse(
@@ -318,31 +306,6 @@ public class LabelSubstitutionFF extends StatelessFF {
     compute(rule, tailNodes, i, j, sourcePath, sentence, scoreAccumulator);
     return scoreAccumulator.getScore();
   }
-
-
-
-  private static class LabelSubstitutionBasicFF extends LabelSubstitutionFF {
-    
-    public LabelSubstitutionBasicFF (FeatureVector weights, String[] args, JoshuaConfiguration config) {
-      super(weights, args, config, "LabelSubstitutionBasic");
-    }
-    
-    private LabelSubstitutionBasicFF(FeatureVector weights, String name,
-        JoshuaConfiguration joshuaConfiguration,
-        List<LabelSubstitutionLabelSmoother> labelSmoothersList) {
-          super(weights, new String[0], joshuaConfiguration, "LabelSubstitutionBasic");
-          this.labelSmoothersList = labelSmoothersList;
-    }
-
-    protected void addFeatures(Accumulator acc,
-        LabelSubstitutionLabelSmoother labelSubstitutionLabelSmoother,
-        List<String> ruleSourceNonterminals, List<String> substitutionNonterminals, Rule rule,
-        List<HGNode> tailNodes) {
-      addBasicFeatures(acc, labelSubstitutionLabelSmoother, ruleSourceNonterminals,
-          substitutionNonterminals);
-    }
-  }
-
   
   public static abstract class LabelSubstitutionLabelSmoother {
 
