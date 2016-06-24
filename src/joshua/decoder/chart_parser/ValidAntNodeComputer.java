@@ -6,6 +6,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.junit.Assert;
+
 import joshua.corpus.Vocabulary;
 import joshua.decoder.chart_parser.DotChart.DotNode;
 import joshua.decoder.chart_parser.DotChart.DotNodeBase;
@@ -48,6 +50,13 @@ public abstract class ValidAntNodeComputer<T extends DotNodeBase<?>> {
     return new ValidAntNodeComputerBasic(dotNode, nonterminalIndex);
   }
 
+  public static ValidAntNodeComputerFuzzyMatchingWithoutDotChart createValidAntNodeComputerFuzzyMatchingWithoutDotChart(DotNode dotNode,
+      int nonterminalIndex,Set<Integer> oovAndGoalNonterminalIndices,
+      boolean strictMatching) {
+    return new ValidAntNodeComputerFuzzyMatchingWithoutDotChart(dotNode, nonterminalIndex, oovAndGoalNonterminalIndices, strictMatching);
+  }
+
+  
   public static boolean  describesAcceptableSuperNodes(DotNodeMultiLabel dotNode,int nonterminalIndex){
     return dotNode.getAntSuperNodes().get(nonterminalIndex).describesAcceptableSuperNodes();
   }
@@ -166,13 +175,24 @@ public abstract class ValidAntNodeComputer<T extends DotNodeBase<?>> {
    * @return
    */
   public boolean isAcceptalbeLabelIndex(Integer labelIndex){
+    //System.err.println("Gideon: isAcceptable: " + labelIndex + " word: " + Vocabulary.word(labelIndex) + "?");
+    
+    boolean result = false;
+    
     if(labelIndicesNonterminalListsAcceptableIndices()){
-      return getAcceptableOrForbiddenLabelIndicesNonterminal().contains(labelIndex);
+      result =  getAcceptableOrForbiddenLabelIndicesNonterminal().contains(labelIndex);
+      //System.err.println(">>>>>>> Gideon: Checking acceptability by matching against list of accepted nonterminal indices");
+      //System.err.println("getAcceptableOrForbiddenLabelIndicesNonterminal(): " + getAcceptableOrForbiddenLabelIndicesNonterminal());
+     
     }
     else{
       //System.err.println(">>>>>>> Gideon: Checking acceptability by matching against list of forbidden nonterminal indices");
-     return !getAcceptableOrForbiddenLabelIndicesNonterminal().contains(labelIndex); 
+      //System.err.println("getAcceptableOrForbiddenLabelIndicesNonterminal(): " + getAcceptableOrForbiddenLabelIndicesNonterminal());
+      result = !getAcceptableOrForbiddenLabelIndicesNonterminal().contains(labelIndex); 
     }
+    //System.err.println("Result: " + result);
+    
+    return result;
   }
   
   public HGNode findNextValidAntNodeAndUpdateRanks(int[] nextRanks, Chart<?, ?> chart) {
@@ -355,4 +375,65 @@ public abstract class ValidAntNodeComputer<T extends DotNodeBase<?>> {
 
   }
 
+  
+  public static class ValidAntNodeComputerFuzzyMatchingWithoutDotChart extends
+  ValidAntNodeComputer<DotNode>{
+    
+    private final Set<Integer> oovAndGoalNonterminalIndices;
+    private final boolean strictMatching;
+    
+
+    protected ValidAntNodeComputerFuzzyMatchingWithoutDotChart(DotNode dotNode, int nonterminalIndex,
+        Set<Integer> oovAndGoalNonterminalIndices,
+        boolean strictMatching) {
+        super(dotNode, nonterminalIndex);   
+        this.oovAndGoalNonterminalIndices = oovAndGoalNonterminalIndices;
+        this.strictMatching = strictMatching;      
+        //Assert.assertTrue(oovAndGoalNonterminalIndices.size() > 0);
+        //for(Integer key : oovAndGoalNonterminalIndices){
+        //  System.err.println("Gideon >>>> oovAndNonTerminalEntry:" + Vocabulary.word(key));
+        //}
+    }
+
+    @Override
+    public List<HGNode> getAlternativesListNonterminal(Chart<?, ?> chart) {
+    
+      
+      SuperNode superNode = dotNode.getAntSuperNodes().get(nonterminalIndex);
+      
+      // If strict matching is required, we return the nodes belonging with the super node
+      if(strictMatching){
+        return superNode.nodes;
+      }
+      else{ // Else we return all nodes in the cell
+        HGNode firstNodeForSuperNode = superNode.nodes.get(0);
+        int i = firstNodeForSuperNode.i;
+        int j = firstNodeForSuperNode.j;
+        Cell cell = chart.getCell(i, j);
+        List<HGNode> result = cell.getSortedNodes();
+        // System.err.println(">>> Gideon: CubePruneStateFuzzyMatching.getAlternativesListNonterminal. size result: "
+        // + result.size());
+        return result;
+      }
+    }
+
+    @Override
+    public Set<Integer> getAcceptableOrForbiddenLabelIndicesNonterminal() {
+      if(strictMatching){
+        return Collections.emptySet();
+      }
+      else{
+        return oovAndGoalNonterminalIndices;
+      }
+    }
+
+    @Override
+    // We always list forbidden indices in this cube pruning state implementation
+    public boolean labelIndicesNonterminalListsAcceptableIndices() {
+      return false;
+    }
+    
+  }
+  
+  
 }

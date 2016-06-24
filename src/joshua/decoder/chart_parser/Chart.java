@@ -5,6 +5,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.PriorityQueue;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -450,9 +451,9 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
     }
   
   
-  private  List<HGNode> getCurrentTailNodesForDotNode(
-      int[] ranks, Chart<?, ?> chart,List<ValidAntNodeComputer<DotNodeMultiLabel>> validAntNodeComputers){
-      NextAntNodesPreparer<DotNodeMultiLabel> cubePruneStatePreparer = NextAntNodesPreparer.createNextAntNodesPreparer(ranks,validAntNodeComputers,this);        
+  private<T extends DotNodeBase<?>>  List<HGNode> getCurrentTailNodesForDotNode(
+      int[] ranks, Chart<?, ?> chart,List<ValidAntNodeComputer<T>> validAntNodeComputers){
+      NextAntNodesPreparer<T> cubePruneStatePreparer = NextAntNodesPreparer.createNextAntNodesPreparer(ranks,validAntNodeComputers,this);        
       return cubePruneStatePreparer.getNextAntNodes();
   }
   
@@ -624,14 +625,28 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
         CubePruneStateBase<T> nextState = null;
         if(peformFuzzyMatching()){
           
-          List<ValidAntNodeComputer<DotNodeMultiLabel>> validAntNodeComputersCasted = new ArrayList<ValidAntNodeComputer<DotNodeMultiLabel>> ();
-          for(ValidAntNodeComputer<T> validAntNodeComputer : validAntNodeComputers){
-            validAntNodeComputersCasted.add((ValidAntNodeComputer<DotNodeMultiLabel>) validAntNodeComputer);
-          }          
+         
           
-          // When first creating the state, we do not compute the node result yet, but instantiate it to null
-          nextState = (CubePruneStateBase<T>) new CubePruneStateFuzzyMatching(null, nextRanks, rules,
-              nextAntNodes, (DotNodeMultiLabel)dotNode,validAntNodeComputersCasted);
+          if(config.use_dot_chart){
+            
+            List<ValidAntNodeComputer<DotNodeMultiLabel>> validAntNodeComputersCasted = new ArrayList<ValidAntNodeComputer<DotNodeMultiLabel>> ();
+            for(ValidAntNodeComputer<T> validAntNodeComputer : validAntNodeComputers){
+              validAntNodeComputersCasted.add((ValidAntNodeComputer<DotNodeMultiLabel>) validAntNodeComputer);
+            }          
+            
+            // When first creating the state, we do not compute the node result yet, but instantiate it to null
+            nextState = (CubePruneStateBase<T>) new CubePruneStateFuzzyMatching(null, nextRanks, rules,
+                nextAntNodes, (DotNodeMultiLabel)dotNode,validAntNodeComputersCasted);
+          }
+          else{
+            List<ValidAntNodeComputer<DotNode>> validAntNodeComputersCasted = new ArrayList<ValidAntNodeComputer<DotNode>> ();
+            for(ValidAntNodeComputer<T> validAntNodeComputer : validAntNodeComputers){
+              validAntNodeComputersCasted.add((ValidAntNodeComputer<DotNode>) validAntNodeComputer);
+            }       
+            
+            // When first creating the state, we do not compute the node result yet, but instantiate it to null
+            nextState = (CubePruneStateBase<T>) new CubePruneStateFuzzyMatchingWithoutDotChart(null, nextRanks, rules, nextAntNodes,(DotNode) dotNode, validAntNodeComputersCasted);
+          }
         }
         else{
           // When first creating the state, we do not compute the node result yet, but instantiate it to null
@@ -748,6 +763,10 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
   private int i = -1;
 
   public HyperGraph expandSansDotChart() {
+    
+    //System.err.println(">>>>> Gideon: Decoding without dot chart!!!");
+    NonterminalMatcher<?> nonterminalMatcher = NonterminalMatcher.createNonterminalMatcher(logger, config);
+    
     for (i = sourceLength - 1; i >= 0; i--) {
       allCandidates = new PriorityQueue[sourceLength - i + 2];
       for (int id = 0; id < allCandidates.length; id++)
@@ -771,11 +790,11 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
               assert arc.getHead().id() == j;
               Trie trie = this.grammars[g].getTrieRoot().match(word);
               if (trie != null && trie.hasRules())
-                addToChart(trie, j, false);
+                addToChart(trie, j, false,nonterminalMatcher);
             }
           } else {
             /* Recurse for non-terminal case */
-            consume(this.grammars[g].getTrieRoot(), i, j - 1);
+            consume(this.grammars[g].getTrieRoot(), i, j - 1,nonterminalMatcher);
           }
         }
 
@@ -808,7 +827,7 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
    * @param l extension point we're looking at
    * 
    */
-  private void consume(Trie trie, int j, int l) {
+  private void consume(Trie trie, int j, int l, NonterminalMatcher<?> nonterminalMatcher) {
     /*
      * 1. If the trie node has any rules, we can add them to the collection
      * 
@@ -835,7 +854,7 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
         Trie nextTrie;
         if ((nextTrie = trie.match(word)) != null) {
           // add to chart item over (i, l)
-          addToChart(nextTrie, arc.getHead().id(), i == j);
+          addToChart(nextTrie, arc.getHead().id(), i == j,nonterminalMatcher);
         }
       }
     }
@@ -843,19 +862,65 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
     // Now try to match nonterminals
     Cell cell = cells.get(j, l);
     if (cell != null) {
-      for (int id : cell.getKeySet()) { // for each supernode (lhs), see if you
-                                        // can match a trie
-        Trie nextTrie = trie.match(id);
-        if (nextTrie != null) {
-          SuperNode superNode = cell.getSuperNode(id);
-          nodeStack.add(superNode);
-          addToChart(nextTrie, superNode.end(), i == j);
-          nodeStack.remove(nodeStack.size() - 1);
+//      for (int id : cell.getKeySet()) { // for each supernode (lhs), see if you
+//                                        // can match a trie
+//        Trie nextTrie = trie.match(id);
+//        if (nextTrie != null) {
+//          SuperNode superNode = cell.getSuperNode(id);
+//          nodeStack.add(superNode);
+//          addToChart(nextTrie, superNode.end(), i == j);
+//          nodeStack.remove(nodeStack.size() - 1);
+//        }
+//      }
+      
+      if(peformFuzzyMatching()){
+          Integer firstNeitherOOVNorGoalNonterminalLHS = 
+              nonterminalMatcher.getFirstNeitherOOVNorGoalLabelSuperNodeLHS(cell.getKeySet());
+            
+          if(firstNeitherOOVNorGoalNonterminalLHS != null){            
+            // Add entries for fuzzy matched rules (not OOV and Goal nonterminals)
+            List<Trie> fuzzyMatchedRules = 
+                nonterminalMatcher.matchAllEqualOrBothNonTerminalAndNotGoalOrOOV(trie, firstNeitherOOVNorGoalNonterminalLHS);
+            for(Trie nextTrie : fuzzyMatchedRules){       
+                SuperNode superNode = cell.getSuperNode(firstNeitherOOVNorGoalNonterminalLHS);
+                addToChartFuzzyMatchingWithoutDotChart(superNode, nextTrie, j,nonterminalMatcher);
+            }
+          }
+          
+          // Add entries for the OOV and Goal keys (with strict matching
+          // First efficiently find the keys for OOV and Goal in O(1) time
+          List<Integer> oovAndGoalLabelKeys = nonterminalMatcher.getOOAndGoalLabelSuperNodeLHSSubList(cell.getKeySet());
+          for(Integer id: oovAndGoalLabelKeys){
+            Trie nextTrie = trie.match(id);
+            if (nextTrie != null) {
+              SuperNode superNode = cell.getSuperNode(id);
+              addToChartFuzzyMatchingWithoutDotChart(superNode, nextTrie, j,nonterminalMatcher);
+            } 
+          }        
+      }   
+      else{  
+        for (int id : cell.getKeySet()) { // for each supernode (lhs), see if you
+          // can match a trie
+          Trie nextTrie = trie.match(id);
+          if (nextTrie != null) {
+            SuperNode superNode = cell.getSuperNode(id);
+            addToChartFuzzyMatchingWithoutDotChart(superNode, nextTrie, j,nonterminalMatcher);
         }
       }
+      
+}
+      
+      
     }
   }
 
+  private void addToChartFuzzyMatchingWithoutDotChart(SuperNode superNode, Trie nextTrie, int j,NonterminalMatcher<?> nonterminalMatcher){
+    nodeStack.add(superNode);
+    addToChart(nextTrie, superNode.end(), i == j,nonterminalMatcher);
+    nodeStack.remove(nodeStack.size() - 1);
+  }
+  
+  
   /**
    * Adds all rules at a trie node to the chart, unless its a unary rule. A
    * unary rule is the first outgoing arc of a grammar's root trie. For
@@ -866,7 +931,7 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
    * @param trie the grammar node
    * @param isUnary whether the rules at this dotnode are unary
    */
-  private void addToChart(Trie trie, int j, boolean isUnary) {
+  private void addToChart(Trie trie, int j, boolean isUnary, NonterminalMatcher<?> nonterminalMatcher) {
 
     // System.err.println(String.format("ADD TO CHART %s unary=%s", dotNode,
     // isUnary));
@@ -874,11 +939,11 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
     if (!isUnary && trie.hasRules()) {
       DotNode dotNode = new DotNode(i, j, trie, new ArrayList<SuperNode>(nodeStack), null);
 
-      addToCandidates(dotNode);
+      addToCandidates(dotNode,nonterminalMatcher);
     }
 
     for (int l = j + 1; l <= sentence.length(); l++)
-      consume(trie, j, l);
+      consume(trie, j, l,nonterminalMatcher);
   }
 
   /**
@@ -889,7 +954,7 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
    * @param tailNodes
    */
   @SuppressWarnings("unchecked")
-  private void addToCandidates(DotNode dotNode) {
+  private void addToCandidates(DotNode dotNode,NonterminalMatcher<?> nonterminalMatcher) {
     // System.err.println(String.format("ADD TO CANDIDATES %s AT INDEX %d",
     // dotNode, dotNode.end() - dotNode.begin()));
 
@@ -899,16 +964,34 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
     Rule bestRule = rules.get(0);
     List<SuperNode> superNodes = dotNode.getAntSuperNodes();
 
-    List<HGNode> tailNodes = new ArrayList<HGNode>();
-    for (SuperNode superNode : superNodes)
-      tailNodes.add(superNode.nodes.get(0));
 
     int[] ranks = new int[1 + superNodes.size()];
     Arrays.fill(ranks, 1);
-
+    
+    List<HGNode> tailNodes = new ArrayList<HGNode>();
+    if(peformFuzzyMatching()){
+      List<ValidAntNodeComputer<DotNode>> validAntNodeComputers = CubePruneStateFuzzyMatchingWithoutDotChart.createValidAntNoteComptersFuzzyMatchingWithoutDotChart(dotNode, rules.get(0), NonterminalMatcher.getGoalAndOOVNonterminalIndicesNegative(config));
+      tailNodes =  getCurrentTailNodesForDotNode(ranks, this, validAntNodeComputers);
+    }
+    else{      
+      for (SuperNode superNode : superNodes)
+        tailNodes.add(superNode.nodes.get(0));      
+    }
+    
     ComputeNodeResult result = new ComputeNodeResult(featureFunctions, bestRule, tailNodes,
         dotNode.begin(), dotNode.end(), dotNode.getSourcePath(), sentence);
-    CubePruneState seedState = CubePruneState.createCubePruneState(result, ranks, rules, tailNodes, dotNode);
+    
+    CubePruneStateBase<DotNode> seedState = null;
+    
+    if(peformFuzzyMatching()){
+      seedState = CubePruneStateFuzzyMatchingWithoutDotChart.createCubePruneStateFuzzyMatchingWithoutDotChart(result, ranks, rules, tailNodes, dotNode, nonterminalMatcher.getGoalAndOOVNonterminalIndicesNegative(config));  
+    }
+    else{
+      seedState = CubePruneState.createCubePruneState(result, ranks, rules, tailNodes, dotNode);
+    }
+    
+    
+    
 
     allCandidates[dotNode.end() - dotNode.begin()].add((CubePruneStateBase<T>) seedState);
   }

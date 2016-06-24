@@ -3,9 +3,12 @@ package joshua.decoder.chart_parser;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.logging.Logger;
+
 import joshua.corpus.Vocabulary;
 import joshua.decoder.JoshuaConfiguration;
 import joshua.decoder.chart_parser.DotChart.DotNode;
@@ -40,6 +43,16 @@ public abstract class NonterminalMatcher <T extends DotNodeBase> {
     return (label.equals(joshuaConfiguration.default_non_terminal) || label
         .equals(joshuaConfiguration.goal_symbol));
   }
+  
+  public static Integer getGoalKey(JoshuaConfiguration joshuaConfiguration){
+    return Vocabulary.id(joshuaConfiguration.goal_symbol);
+  }
+  
+  
+  public static Integer getOOVKey(JoshuaConfiguration joshuaConfiguration){
+    return Vocabulary.id(joshuaConfiguration.default_non_terminal);
+  }
+  
 
   /**
    * This method returns a list of all indices corresponding to Nonterminals in the Vocabulary
@@ -58,6 +71,25 @@ public abstract class NonterminalMatcher <T extends DotNodeBase> {
     return result;
   }
 
+  
+  public static Set<Integer> getGoalAndOOVNonterminalIndicesNegative(
+      JoshuaConfiguration joshuaConfiguration) {
+    Set<Integer> result = new HashSet<Integer>();
+    List<Integer> nonterminalIndices = Vocabulary.getNonterminalIndices();
+    for (Integer nonterminalIndex : nonterminalIndices) {
+      if (isOOVLabelOrGoalLabel(Vocabulary.word(nonterminalIndex), joshuaConfiguration)) {
+        
+        if(nonterminalIndex < 0 ){
+          throw new RuntimeException("Expected to get a positive index");
+        }
+        // We want negative nonterminal indexes for compatibility with the indices of Super Nodes
+        // Since  Vocabulary.getNonterminalIndices() returns positive indices, we have to negate the value
+        result.add(-nonterminalIndex);
+      }
+    }
+    return result;
+  }
+  
   public static NonterminalMatcher<?> createNonterminalMatcher(Logger logger,
       JoshuaConfiguration joshuaConfiguration) {
     List<Integer> allNonterminalIndicesExceptForGoalAndOOV = getAllNonterminalIndicesExceptForGoalAndOOV(joshuaConfiguration);
@@ -157,6 +189,22 @@ public abstract class NonterminalMatcher <T extends DotNodeBase> {
 
   }
 
+  /**
+   * For usage by fuzzy matching without dot chart
+   * @param trieNode
+   * @param wordID
+   * @return
+   */
+  protected List<Trie> matchAllEqualOrBothNonTerminalAndNotGoalOrOOV(Trie trieNode, int wordID) {
+    if (!isNonterminal(wordID)) {
+      throw new RuntimeException("Error : expexted nonterminal, but did not get it "
+          + "in matchAllEqualOrBothNonTerminalAndNotGoalOrOOV(DotNode dotNode, int wordID)");
+    }
+    return getNonTerminalsListFromChildren(trieNode, wordID);
+
+  }
+  
+  
   public List<SuperNode> getOOAndGoalLabelSuperNodeSubList(List<SuperNode> superNodes){
     List<SuperNode> result = new ArrayList<SuperNode>();
     for(SuperNode superNode : superNodes){
@@ -166,6 +214,17 @@ public abstract class NonterminalMatcher <T extends DotNodeBase> {
     }
     return result;
   }
+
+  public List<Integer> getOOAndGoalLabelSuperNodeLHSSubList(Set<Integer> superNodeLHSs){
+    List<Integer> result = new ArrayList<Integer>();
+    for(Integer superNodeLHS : superNodeLHSs){
+      if(isOOVLabelOrGoalLabel(Vocabulary.word(superNodeLHS), joshuaConfiguration)){
+        result.add(superNodeLHS);
+      }
+    }
+    return result;
+  }
+  
   
   public List<SuperNode> getNeitherOOVNorGoalLabelSuperNodeSubList(List<SuperNode> superNodes){
     List<SuperNode> result = new ArrayList<SuperNode>();
@@ -181,6 +240,15 @@ public abstract class NonterminalMatcher <T extends DotNodeBase> {
     for(SuperNode superNode : superNodes){
       if(!isOOVLabelOrGoalLabel(Vocabulary.word(superNode.lhs), joshuaConfiguration)){
         return superNode;
+      }
+    }
+    return null;
+  }
+
+  public Integer getFirstNeitherOOVNorGoalLabelSuperNodeLHS(Set<Integer> superNodeLHSs){
+    for(Integer superNodeLHS : superNodeLHSs){
+      if(!isOOVLabelOrGoalLabel(Vocabulary.word(superNodeLHS), joshuaConfiguration)){
+        return superNodeLHS;
       }
     }
     return null;

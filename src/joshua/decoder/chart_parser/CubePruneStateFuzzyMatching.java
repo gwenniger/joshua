@@ -128,10 +128,5 @@ public class CubePruneStateFuzzyMatching extends CubePruneStateBase<DotNodeMulti
       }
     }
   }
-
-  @Override
-  public List<HGNode> getAlternativesListNonterminal(int nonterminalIndex, Chart<?, ?> chart) {
-    return validAntNodeComputers.get(nonterminalIndex).getAlternativesListNonterminal(chart);
-  }
   
 }

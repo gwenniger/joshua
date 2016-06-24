@@ -286,11 +286,6 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
       if(nonTerminalMatcher.performFuzzyMatching()){
         
         // Here it does not really matter what supernode we use, since no matching is enforced, so we use the first
-        
-        
-                
-        
-        
         SuperNodeAlternativesSpecification superNodesAlternativesSpecification = null;
         
         if(nonTerminalMatcher.performFuzzyMatchingWithRefinedStateExploration()){
