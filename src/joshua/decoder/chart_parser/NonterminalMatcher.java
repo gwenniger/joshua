@@ -215,13 +215,29 @@ public abstract class NonterminalMatcher <T extends DotNodeBase> {
     return result;
   }
 
+  /**
+   * Returns none, zero or both of the Goal key and OOV key, depending on which of these 
+   * are present in the input list (basically an intersection of the set of these two 
+   * elements with the elements in the input list)
+   * 
+   * Provided the set implements the contains method with O(1) complexity, which
+   * is true for a HashSet as well as the key set of a HashMap (the use case)
+   * then the complexity of this method is also O(1)
+   * 
+   * @param superNodeLHSs
+   * @return
+   */
   public List<Integer> getOOAndGoalLabelSuperNodeLHSSubList(Set<Integer> superNodeLHSs){
     List<Integer> result = new ArrayList<Integer>();
-    for(Integer superNodeLHS : superNodeLHSs){
-      if(isOOVLabelOrGoalLabel(Vocabulary.word(superNodeLHS), joshuaConfiguration)){
-        result.add(superNodeLHS);
-      }
+   
+    if(superNodeLHSs.contains(getOOVKey(joshuaConfiguration))){
+      result.add(getOOVKey(joshuaConfiguration));
     }
+    
+    if(superNodeLHSs.contains(getGoalKey(joshuaConfiguration))){
+      result.add(getGoalKey(joshuaConfiguration));
+    }
+    
     return result;
   }
   
