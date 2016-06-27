@@ -5,6 +5,8 @@ package joshua.decoder.ff;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Pattern;
+
 import joshua.decoder.JoshuaConfiguration;
 import joshua.decoder.chart_parser.NonterminalMatcher;
 import joshua.decoder.chart_parser.SourcePath;
@@ -18,6 +20,7 @@ public class LabelSubstitutionFF extends StatelessFF {
   private static final String STANDARD_LABEL_SUBSTITUTION_SPARSE_FEATURE_FUNCTION_NAME = "LabelSubstitutionSparse";
   private static final String DOUBLE_LABEL_WITH_LABEL_SPLITTING_SMOOTHING_ARGUMENT = "DoubleLabelWithLabelSplittingSmoothing";
   private static final String DOUBLE_LABEL_SEPARATOR = "<<>>";
+  private static Pattern DOUBLE_LABEL_SEPARATOR_PATTERN = Pattern.compile(DOUBLE_LABEL_SEPARATOR);
 
   private static final String FUZZY_MATCHING_GLUE_GRAMMAR_NONTERIMINAL = "[X]";
 
@@ -80,7 +83,7 @@ public class LabelSubstitutionFF extends StatelessFF {
   public static List<String> getLabelParts(String originalLabelString) {
     String originalLabelStringWithoutBrackets = originalLabelString.substring(1,
         originalLabelString.length() - 1);
-    return Arrays.asList(originalLabelStringWithoutBrackets.split(DOUBLE_LABEL_SEPARATOR));
+    return Arrays.asList(DOUBLE_LABEL_SEPARATOR_PATTERN.split(originalLabelStringWithoutBrackets));
   }
 
   private static List<LabelSubstitutionLabelSmoother> createNoSmoothingLabelSubstiontionSmoothersList() {
