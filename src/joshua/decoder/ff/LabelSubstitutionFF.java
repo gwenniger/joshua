@@ -171,14 +171,14 @@ public class LabelSubstitutionFF extends StatelessFF {
         rule.isInverting());
   }
 
-  private static List<String> getAllLabelsList(List<String> ruleSourceNonterminals,
-      List<String> substitutionNonterminals) {
-    List<String> allLabelsList = new ArrayList<String>();
-    allLabelsList.addAll(ruleSourceNonterminals);
-    allLabelsList.addAll(substitutionNonterminals);
-    return allLabelsList;
-
-  }
+//  private static List<String> getAllLabelsList(List<String> ruleSourceNonterminals,
+//      List<String> substitutionNonterminals) {
+//    List<String> allLabelsList = new ArrayList<String>();
+//    allLabelsList.addAll(ruleSourceNonterminals);
+//    allLabelsList.addAll(substitutionNonterminals);
+//    return allLabelsList;
+//
+//  }
 
   private boolean isFuzzyMatchingGlueGrammarNonterminal(String ruleNonterminal) {
     return ruleNonterminal.equals(FUZZY_MATCHING_GLUE_GRAMMAR_NONTERIMINAL);
@@ -276,15 +276,21 @@ public class LabelSubstitutionFF extends StatelessFF {
         List<String> substitutionNonterminals = RulePropertiesQuerying
             .getSourceNonterminalStrings(tailNodes);
 
-        if (labelSubstitutionLabelSmoother.ruleHasAppropriateLabelsForSmoother(getAllLabelsList(
-            ruleSourceNonterminals, substitutionNonterminals))) {
+        // Removed the check for appropriate labels for the labelSubstitutionLabelSmoother smoother. 
+        // (Commented out code)
+        // We assume that when double 
+        // labels are used this is done uniformly, so this check, which is computationally costly,
+        // is unnecessary and therefore better to avoid.
+        
+        //if (labelSubstitutionLabelSmoother.ruleHasAppropriateLabelsForSmoother(getAllLabelsList(
+        //    ruleSourceNonterminals, substitutionNonterminals))) {
           // Assert.assertEquals(ruleSourceNonterminals.size(), substitutionNonterminals.size());
 
           // Add the features. Depending on the implementation these are only the basic features
           // or the basic features and sparse feature
           addFeatures(acc, labelSubstitutionLabelSmoother, ruleSourceNonterminals,
               substitutionNonterminals, rule, tailNodes);
-        }
+        //}
       }
     }
     return null;
@@ -316,12 +322,13 @@ public class LabelSubstitutionFF extends StatelessFF {
 
     protected abstract String typeOfSmoothingSuffixString();
 
-    protected abstract boolean ruleHasAppropriateLabelsForSmoother(List<String> allLabelsList);
+    //protected abstract boolean ruleHasAppropriateLabelsForSmoother(List<String> allLabelsList);
 
     protected static String getStringWithLabelBrackets(String string) {
       return "[" + string + "]";
     }
 
+    /*
     protected static boolean ruleLHSHasMultipleLabelParts(List<String> allLabelsList) {
       for (String label : allLabelsList) {
         if (label.contains(DOUBLE_LABEL_SEPARATOR)) {
@@ -329,7 +336,7 @@ public class LabelSubstitutionFF extends StatelessFF {
         }
       }
       return false;
-    }
+    }*/
 
   }
 
@@ -345,10 +352,10 @@ public class LabelSubstitutionFF extends StatelessFF {
       return "";
     }
 
-    @Override
-    protected boolean ruleHasAppropriateLabelsForSmoother(List<String> allLabelsList) {
-      return true;
-    }
+    //@Override
+    //protected boolean ruleHasAppropriateLabelsForSmoother(List<String> allLabelsList) {
+    //  return true;
+    //}
 
   }
 
@@ -365,10 +372,10 @@ public class LabelSubstitutionFF extends StatelessFF {
       return "_PhraseCentric";
     }
 
-    @Override
-    protected boolean ruleHasAppropriateLabelsForSmoother(List<String> allLabelsList) {
-      return ruleLHSHasMultipleLabelParts(allLabelsList);
-    }
+    //@Override
+    //protected boolean ruleHasAppropriateLabelsForSmoother(List<String> allLabelsList) {
+    //  return ruleLHSHasMultipleLabelParts(allLabelsList);
+    //}
   }
 
   public static class LastSublabelOnlyLabelSubstitutionLabelSmoother extends
@@ -384,10 +391,10 @@ public class LabelSubstitutionFF extends StatelessFF {
       return "_ParentRelative";
     }
 
-    @Override
-    protected boolean ruleHasAppropriateLabelsForSmoother(List<String> allLabelsList) {
-      return ruleLHSHasMultipleLabelParts(allLabelsList);
-    }
+    //@Override
+    //protected boolean ruleHasAppropriateLabelsForSmoother(List<String> allLabelsList) {
+    //  return ruleLHSHasMultipleLabelParts(allLabelsList);
+    //}
   }
 
 }
