@@ -1,7 +1,5 @@
 package joshua.corpus;
 
-import static joshua.util.FormatUtils.isNonterminal;
-
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
@@ -14,10 +12,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
+import java.util.concurrent.locks.StampedLock;
 import joshua.decoder.Decoder;
 import joshua.decoder.ff.lm.NGramLanguageModel;
 import joshua.util.FormatUtils;
+import static joshua.util.FormatUtils.isNonterminal;
+
 
 /**
  * Static singular vocabulary class.
@@ -28,67 +28,67 @@ import joshua.util.FormatUtils;
 
 public class Vocabulary {
 
-  private final static ArrayList<NGramLanguageModel> lms = new ArrayList<NGramLanguageModel>();
+  private static volatile List<Integer> nonTerminalIndices;
+  private final static ArrayList<NGramLanguageModel> LMs = new ArrayList<>();
 
   private static List<String> idToString;
   private static Map<String, Integer> stringToId;
-  
-  private static volatile List<Integer> nonTerminalIndices;
-
-  private static final Integer lock = new Integer(0);
+  private static final StampedLock lock = new StampedLock();
 
   static final int UNKNOWN_ID = 0;
   static final String UNKNOWN_WORD = "<unk>";
 
   public static final String START_SYM = "<s>";
   public static final String STOP_SYM = "</s>";
-  
+
   static {
     clear();
   }
 
   public static boolean registerLanguageModel(NGramLanguageModel lm) {
-    synchronized (lock) {
+    long lock_stamp = lock.writeLock();
+    try {
       // Store the language model.
-      lms.add(lm);
+      LMs.add(lm);
       // Notify it of all the existing words.
       boolean collision = false;
       for (int i = idToString.size() - 1; i > 0; i--)
         collision = collision || lm.registerWord(idToString.get(i), i);
       return collision;
+    } finally {
+      lock.unlockWrite(lock_stamp);
     }
   }
 
   /**
    * Reads a vocabulary from file. This deletes any additions to the vocabulary made prior to
    * reading the file.
-   * 
-   * @param file_name
+   *
+   * @param vocab_file path to a vocabulary file
    * @return Returns true if vocabulary was read without mismatches or collisions.
-   * @throws IOException
+   * @throws IOException of the file cannot be found or read properly
    */
   public static boolean read(final File vocab_file) throws IOException {
-    synchronized (lock) {
-      DataInputStream vocab_stream =
-          new DataInputStream(new BufferedInputStream(new FileInputStream(vocab_file)));
-      int size = vocab_stream.readInt();
-      Decoder.LOG(1, String.format("Read %d entries from the vocabulary", size));
-      clear();
-      for (int i = 0; i < size; i++) {
-        int id = vocab_stream.readInt();
-        String token = vocab_stream.readUTF();
-        if (id != Math.abs(id(token))) {
-          vocab_stream.close();
-          return false;
-        }
+    DataInputStream vocab_stream =
+        new DataInputStream(new BufferedInputStream(new FileInputStream(vocab_file)));
+    int size = vocab_stream.readInt();
+    Decoder.LOG(1, String.format("Read %d entries from the vocabulary", size));
+    clear();
+    for (int i = 0; i < size; i++) {
+      int id = vocab_stream.readInt();
+      String token = vocab_stream.readUTF();
+      if (id != Math.abs(id(token))) {
+        vocab_stream.close();
+        return false;
       }
-      vocab_stream.close();
-      return (size + 1 == idToString.size());
     }
+    vocab_stream.close();
+    return (size + 1 == idToString.size());
   }
 
   public static void write(String file_name) throws IOException {
-    synchronized (lock) {
+    long lock_stamp =lock.readLock();
+    try {
       File vocab_file = new File(file_name);
       DataOutputStream vocab_stream =
           new DataOutputStream(new BufferedOutputStream(new FileOutputStream(vocab_file)));
@@ -100,50 +100,83 @@ public class Vocabulary {
       }
       vocab_stream.close();
     }
+    finally{
+      lock.unlockRead(lock_stamp);
+    }
   }
 
   /**
    * Get the id of the token if it already exists, new id is created otherwise.
+   *
+   * TODO: currently locks for every call. Separate constant (frozen) ids from
+   * changing (e.g. OOV) ids. Constant ids could be immutable -&gt; no locking.
+   * Alternatively: could we use ConcurrentHashMap to not have to lock if
+   * actually contains it and only lock for modifications?
    * 
-   * TODO: currently locks for every call.
-   * Separate constant (frozen) ids from changing (e.g. OOV) ids.
-   * Constant ids could be immutable -> no locking.
-   * Alternatively: could we use ConcurrentHashMap to not have to lock if actually contains it and only lock for modifications? 
+   * @param token a token to obtain an id for
+   * @return the token id
    */
   public static int id(String token) {
-    synchronized (lock) {
+    // First attempt an optimistic read
+    long attempt_read_lock = lock.tryOptimisticRead();
+    if (stringToId.containsKey(token)) {
+      int resultId = stringToId.get(token);
+      if (lock.validate(attempt_read_lock)) {
+        return resultId;
+      }
+    }
+
+    // The optimistic read failed, try a read with a stamped read lock
+    long read_lock_stamp = lock.readLock();
+    try {
       if (stringToId.containsKey(token)) {
         return stringToId.get(token);
-      } else {
-        if (nonTerminalIndices != null && nt(token)) {
-          throw new IllegalArgumentException("After the nonterminal indices have been set by calling getNonterminalIndices you can't call id on new nonterminals anymore.");
-        }
-        int id = idToString.size() * (nt(token) ? -1 : 1);
-
-        // register this (token,id) mapping with each language
-        // model, so that they can map it to their own private
-        // vocabularies
-        for (NGramLanguageModel lm : lms)
-          lm.registerWord(token, Math.abs(id));
-
-        idToString.add(token);
-        stringToId.put(token, id);
-        return id;
       }
+    } finally {
+      lock.unlockRead(read_lock_stamp);
+    }
+
+    if (nonTerminalIndices != null && nt(token)) {
+       throw new IllegalArgumentException("After the nonterminal indices have been set by calling getNonterminalIndices you can't call id on new nonterminals anymore.");
+    }    
+    
+    // Looks like the id we want is not there, let's get a write lock and add it
+    long write_lock_stamp = lock.writeLock();
+    try {
+      if (stringToId.containsKey(token)) {
+        return stringToId.get(token);
+      }
+      int id = idToString.size() * (FormatUtils.isNonterminal(token) ? -1 : 1);
+
+      // register this (token,id) mapping with each language
+      // model, so that they can map it to their own private
+      // vocabularies
+      for (NGramLanguageModel lm : LMs)
+        lm.registerWord(token, Math.abs(id));
+
+      idToString.add(token);
+      stringToId.put(token, id);
+      return id;
+    } finally {
+      lock.unlockWrite(write_lock_stamp);
     }
   }
 
   public static boolean hasId(int id) {
-    synchronized (lock) {
+    long lock_stamp = lock.readLock();
+    try {
       id = Math.abs(id);
       return (id < idToString.size());
+    }
+    finally{
+      lock.unlockRead(lock_stamp);
     }
   }
 
   public static int[] addAll(String sentence) {
     return addAll(sentence.split("\\s+"));
   }
-  
+
   public static int[] addAll(String[] tokens) {
     int[] ids = new int[tokens.length];
     for (int i = 0; i < tokens.length; i++)
@@ -152,17 +185,28 @@ public class Vocabulary {
   }
 
   public static String word(int id) {
-    synchronized (lock) {
+    long lock_stamp = lock.readLock();
+    try {
       id = Math.abs(id);
       return idToString.get(id);
+    }
+    finally{
+      lock.unlockRead(lock_stamp);
     }
   }
 
   public static String getWords(int[] ids) {
-    if (ids.length == 0) return "";
+    return getWords(ids, " ");
+  }
+  
+  public static String getWords(int[] ids, final String separator) {
+    if (ids.length == 0) {
+      return "";
+    }
     StringBuilder sb = new StringBuilder();
-    for (int i = 0; i < ids.length - 1; i++)
-      sb.append(word(ids[i])).append(" ");
+    for (int i = 0; i < ids.length - 1; i++) {
+      sb.append(word(ids[i])).append(separator);
+    }
     return sb.append(word(ids[ids.length - 1])).toString();
   }
 
@@ -172,7 +216,7 @@ public class Vocabulary {
       sb.append(word(id)).append(" ");
     return sb.deleteCharAt(sb.length() - 1).toString();
   }
-  
+
   /**
    * This method returns a list of all (positive) indices
    * corresponding to Nonterminals in the Vocabulary.
@@ -196,13 +240,13 @@ public class Vocabulary {
     List<Integer> nonTerminalIndices = new ArrayList<Integer>();
     for(int i = 0; i < idToString.size(); i++) {
       final String word = idToString.get(i);
-      if(isNonterminal(word)){
-        nonTerminalIndices.add(i);
-      }
-    }
-    return nonTerminalIndices;
+    if(isNonterminal(word)){
+       nonTerminalIndices.add(i);
+     }
+   }
+   return nonTerminalIndices;
   }
-
+  
   public static int getUnknownId() {
     return UNKNOWN_ID;
   }
@@ -218,37 +262,57 @@ public class Vocabulary {
    * @return
    */
   public static boolean nt(int id) {
-    return (id < 0);
+      return (id < 0);
   }
-
+  
   public static boolean nt(String word) {
     return FormatUtils.isNonterminal(word);
   }
 
+  
   public static int size() {
-    synchronized (lock) {
+    long lock_stamp = lock.readLock();
+    try {
       return idToString.size();
+    } finally {
+      lock.unlockRead(lock_stamp);
     }
   }
 
-  public static int getTargetNonterminalIndex(int id) {
+  public static synchronized int getTargetNonterminalIndex(int id) {
     return FormatUtils.getNonterminalIndex(word(id));
   }
 
   /**
-   * Clears the vocabulary and initializes it with an unknown word.
-   * Registered language models are left unchanged.
+   * Clears the vocabulary and initializes it with an unknown word. Registered
+   * language models are left unchanged.
    */
   public static void clear() {
-    synchronized (lock) {
-      nonTerminalIndices = null;
-
+    long lock_stamp = lock.writeLock();
+    try {
       idToString = new ArrayList<String>();
-      stringToId = new HashMap<String, Integer>();      
-  
+      stringToId = new HashMap<String, Integer>();
+
       idToString.add(UNKNOWN_ID, UNKNOWN_WORD);
       stringToId.put(UNKNOWN_WORD, UNKNOWN_ID);
+    } finally {
+      lock.unlockWrite(lock_stamp);
     }
   }
+
+  public static void unregisterLanguageModels() {
+    LMs.clear();
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if(getClass() == o.getClass()) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+  
+
   
 }
