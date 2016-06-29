@@ -19,13 +19,22 @@ public  class LabelSubstitutionSparseFF extends LabelSubstitutionFF {
         this.labelSmoothersList = labelSmoothersList;
   }
   
+  
   @Override
-  protected void addFeatures(Accumulator acc,
-      LabelSubstitutionLabelSmoother labelSubstitutionLabelSmoother,
+  protected void addAllFeatures(Accumulator acc,
+      List<LabelSubstitutionLabelSmoother> labelSubstitutionLabelSmoothers,
       List<String> ruleSourceNonterminals, List<String> substitutionNonterminals, Rule rule,
-      List<HGNode> tailNodes) {
-    addBasicFeatures(acc, labelSubstitutionLabelSmoother, ruleSourceNonterminals,
-        substitutionNonterminals);
-    addSparseFeature(acc, labelSubstitutionLabelSmoother, rule, tailNodes);
+      List<HGNode> tailNodes){
+    addAllBasicFeatures(acc, labelSubstitutionLabelSmoothers, ruleSourceNonterminals, substitutionNonterminals, rule, tailNodes);
+    addAllSparseFeatures(acc, labelSubstitutionLabelSmoothers, ruleSourceNonterminals, substitutionNonterminals, rule, tailNodes);
+  }
+  
+  protected void addAllSparseFeatures(Accumulator acc,
+      List<LabelSubstitutionLabelSmoother> labelSubstitutionLabelSmoothers,
+      List<String> ruleSourceNonterminals, List<String> substitutionNonterminals, Rule rule,
+      List<HGNode> tailNodes){
+    for(LabelSubstitutionLabelSmoother labelSubstitutionLabelSmoother : labelSubstitutionLabelSmoothers){
+      addSparseFeature(acc, labelSubstitutionLabelSmoother, rule, tailNodes);
+    }
   }
 }

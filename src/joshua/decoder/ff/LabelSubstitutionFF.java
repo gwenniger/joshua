@@ -14,6 +14,7 @@ import joshua.decoder.ff.state_maintenance.DPState;
 import joshua.decoder.ff.tm.Rule;
 import joshua.decoder.hypergraph.HGNode;
 import joshua.decoder.segment_file.Sentence;
+import joshua.util.Pair;
 
 public class LabelSubstitutionFF extends StatelessFF {
   private static final String STANDARD_LABEL_SUBSTITUTION_BASIC_FEATURE_FUNCTION_NAME = "LabelSubstitution";
@@ -27,6 +28,9 @@ public class LabelSubstitutionFF extends StatelessFF {
   private final JoshuaConfiguration joshuaConfiguration;
   protected  List<LabelSubstitutionLabelSmoother> labelSmoothersList;
 
+  private static final LabelSubstitutionFFCache LABEL_SUBSTITUTION_FF_CACHE = LabelSubstitutionFFCache.createLabelSubstitutionFFCache(); 
+  
+  
   public LabelSubstitutionFF(FeatureVector weights, String[] args, JoshuaConfiguration config) {
     super(weights, "LabelSubstitution", args, config);
     this.joshuaConfiguration = config;
@@ -142,7 +146,7 @@ public class LabelSubstitutionFF extends StatelessFF {
     return labelSubstitutionLabelSmoother.getSmoothedLabelString(RulePropertiesQuerying.getLHSAsString(rule)); 
   }
   
-  private static List<String>  getLabelSmoothedSourceNonterminalsg(Rule rule,
+  private static List<String>  getLabelSmoothedSourceNonterminals(Rule rule,
       LabelSubstitutionLabelSmoother labelSubstitutionLabelSmoother){
     List<String> ruleSourceNonterminals = RulePropertiesQuerying
         .getRuleSourceNonterminalStrings(rule);
@@ -166,7 +170,7 @@ public class LabelSubstitutionFF extends StatelessFF {
     return LabelSubstitutionFeatureStrings.getGapLabelsForRuleIdenitySubstitutionFeature(
         getFeatureNamePrefix(labelSubstitutionLabelSmoother),  
         getLabelSmoothedLHS(rule, labelSubstitutionLabelSmoother), 
-        getLabelSmoothedSourceNonterminalsg(rule, labelSubstitutionLabelSmoother), 
+        getLabelSmoothedSourceNonterminals(rule, labelSubstitutionLabelSmoother), 
         getSmoothedSubstitutionLabelsList(tailNodes, labelSubstitutionLabelSmoother),
         rule.isInverting());
   }
@@ -226,6 +230,59 @@ public class LabelSubstitutionFF extends StatelessFF {
     }
   }
 
+  
+  
+  /**
+   * This method adds the basic label substitution features: 1. Label matching features (MATCH and
+   * NOMATCH) 2. Simple Label substitution features: LabelX substitutes LabelY
+   * 
+   * @param acc
+   * @param labelSubstitutionLabelSmoother
+   * @param ruleSourceNonterminals
+   * @param substitutionNonterminals
+   */
+  protected List<String> getBasicFeaturesForCaching(Accumulator acc,
+      List<LabelSubstitutionLabelSmoother> labelSubstitutionLabelSmoothers,
+      List<String> ruleSourceNonterminals, List<String> substitutionNonterminals) {
+    
+    List<String> result = new ArrayList<String>();
+    
+    for (int nonterinalIndex = 0; nonterinalIndex < ruleSourceNonterminals.size(); nonterinalIndex++) {
+      String ruleNonterminal = ruleSourceNonterminals.get(nonterinalIndex);
+      String substitutionNonterminal = substitutionNonterminals.get(nonterinalIndex);
+
+      /**
+       * We only want to add matching and substitution features for labels that are actually allowed
+       * to match something apart from themselves. The GOAL and OOV label which can only match
+       * themselves otherwise distort the information of the real" (i.e. free) substitutions
+       */
+      if (!NonterminalMatcher.isOOVLabelOrGoalLabel(ruleNonterminal, joshuaConfiguration)) {
+
+        /**
+         * For matching features, we are furthermore not interested in substitutions of labels for
+         * the glue grammar nonterminal symbol ([X]) as such substitutions are necessary and again
+         * would confuse the intended purpose of this feature, as something that counts fully
+         * optional substitutions of either matching labels or non-matching labels.
+         */
+        if (!isFuzzyMatchingGlueGrammarNonterminal(ruleNonterminal)) {
+          for(LabelSubstitutionLabelSmoother labelSubstitutionLabelSmoother : labelSubstitutionLabelSmoothers){
+          result.add(
+              computeLabelMatchingFeature(ruleNonterminal, substitutionNonterminal,
+                  labelSubstitutionLabelSmoother));
+          }
+        }
+
+        for(LabelSubstitutionLabelSmoother labelSubstitutionLabelSmoother : labelSubstitutionLabelSmoothers){
+          result.add(
+              computeLabelSubstitutionFeature(ruleNonterminal, substitutionNonterminal,
+                  labelSubstitutionLabelSmoother));  
+        }        
+      }
+    }
+    return result;
+  }
+
+  
   /**
    * This method adds a sparse label substitution feature to the accumulator. The feature consists
    * of the rule identity, as summarized by its labels and whether it is inverted or not, plus the
@@ -248,34 +305,71 @@ public class LabelSubstitutionFF extends StatelessFF {
   }
 
   /**
-   * This method add the features to the accumulator, and is overwritten in LabelSubstitutionSparseFF
+   *  This method add the features to the accumulator, and is overwritten in LabelSubstitutionSparseFF
    * @param acc
-   * @param labelSubstitutionLabelSmoother
+   * @param labelSubstitutionLabelSmoothers
    * @param ruleSourceNonterminals
    * @param substitutionNonterminals
    * @param rule
    * @param tailNodes
    */
-  protected void addFeatures(Accumulator acc,
-      LabelSubstitutionLabelSmoother labelSubstitutionLabelSmoother,
+  protected void addAllFeatures(Accumulator acc,
+      List<LabelSubstitutionLabelSmoother> labelSubstitutionLabelSmoothers,
       List<String> ruleSourceNonterminals, List<String> substitutionNonterminals, Rule rule,
       List<HGNode> tailNodes){
-    addBasicFeatures(acc, labelSubstitutionLabelSmoother, ruleSourceNonterminals,
-        substitutionNonterminals);
+    addAllBasicFeatures(acc, labelSubstitutionLabelSmoothers, ruleSourceNonterminals, substitutionNonterminals, rule, tailNodes);
   }
+  
+  /**
+   * Method that adds all Basic Features, using caching to make this more efficient
+   * 
+   * @param acc
+   * @param labelSubstitutionLabelSmoothers
+   * @param ruleSourceNonterminals
+   * @param substitutionNonterminals
+   * @param rule
+   * @param tailNodes
+   */
+  protected void addAllBasicFeatures(Accumulator acc,
+      List<LabelSubstitutionLabelSmoother> labelSubstitutionLabelSmoothers,
+      List<String> ruleSourceNonterminals, List<String> substitutionNonterminals, Rule rule,
+      List<HGNode> tailNodes){
+    
+    for (int nonterinalIndex = 0; nonterinalIndex < ruleSourceNonterminals.size(); nonterinalIndex++) {
+      String ruleNonterminal = ruleSourceNonterminals.get(nonterinalIndex);
+      String substitutionNonterminal = substitutionNonterminals.get(nonterinalIndex);
+      
+      Pair<String,String> substitutionPair = new Pair<String,String>(ruleNonterminal,substitutionNonterminal);
+      List<String> features = null; 
+      
+      if(LABEL_SUBSTITUTION_FF_CACHE.containsBasicSubstitutionFeatures(substitutionPair)){
+        features = LABEL_SUBSTITUTION_FF_CACHE.getBaicFeatures(substitutionPair);
+      }
+      else{
+        features = getBasicFeaturesForCaching(acc, labelSubstitutionLabelSmoothers, ruleSourceNonterminals, substitutionNonterminals);
+        LABEL_SUBSTITUTION_FF_CACHE.addFeatures(substitutionPair, features);
+      }
+      for(String feature : features){
+        acc.add(feature, 1);
+      }      
+    }
+  }
+  
 
   @Override
   public DPState compute(Rule rule, List<HGNode> tailNodes, int i, int j, SourcePath sourcePath,
       Sentence sentence, Accumulator acc) {
     if (rule != null && (tailNodes != null)) {
 
-      for (LabelSubstitutionLabelSmoother labelSubstitutionLabelSmoother : this.labelSmoothersList) {
-
-        List<String> ruleSourceNonterminals = RulePropertiesQuerying
-            .getRuleSourceNonterminalStrings(rule);
-        List<String> substitutionNonterminals = RulePropertiesQuerying
-            .getSourceNonterminalStrings(tailNodes);
-
+      List<String> ruleSourceNonterminals = RulePropertiesQuerying
+          .getRuleSourceNonterminalStrings(rule);
+      List<String> substitutionNonterminals = RulePropertiesQuerying
+          .getSourceNonterminalStrings(tailNodes);
+      
+      
+      addAllFeatures(acc, this.labelSmoothersList, ruleSourceNonterminals, substitutionNonterminals, rule, tailNodes);
+      
+     // for (LabelSubstitutionLabelSmoother labelSubstitutionLabelSmoother : this.labelSmoothersList) {
         // Removed the check for appropriate labels for the labelSubstitutionLabelSmoother smoother. 
         // (Commented out code)
         // We assume that when double 
@@ -288,14 +382,17 @@ public class LabelSubstitutionFF extends StatelessFF {
 
           // Add the features. Depending on the implementation these are only the basic features
           // or the basic features and sparse feature
-          addFeatures(acc, labelSubstitutionLabelSmoother, ruleSourceNonterminals,
-              substitutionNonterminals, rule, tailNodes);
+        //  addFeatures(acc, labelSubstitutionLabelSmoother, ruleSourceNonterminals,
+         //     substitutionNonterminals, rule, tailNodes);
         //}
-      }
+      //}
     }
     return null;
   }
 
+  
+  
+  
   /**
    * This method computes the score for this feature type only. This is useful for prediction as
    * needed for optimization of addition of candidates during cube pruning, when working with fuzzy
