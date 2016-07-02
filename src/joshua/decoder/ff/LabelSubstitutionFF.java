@@ -20,6 +20,7 @@ public class LabelSubstitutionFF extends StatelessFF {
   private static final String STANDARD_LABEL_SUBSTITUTION_BASIC_FEATURE_FUNCTION_NAME = "LabelSubstitution";
   private static final String STANDARD_LABEL_SUBSTITUTION_SPARSE_FEATURE_FUNCTION_NAME = "LabelSubstitutionSparse";
   private static final String DOUBLE_LABEL_WITH_LABEL_SPLITTING_SMOOTHING_ARGUMENT = "DoubleLabelWithLabelSplittingSmoothing";
+  private static final String DOUBLE_LABEL_WITH_LABEL_SPLITTING_SMOOTHING_ONLY_SINGLE_LABEL_FEATURES_ARGUMENT = "DoubleLabelWithLabelSplittingSmoothingOnlySingleLabelFeatures";
   private static final String DOUBLE_LABEL_SEPARATOR = "<<>>";
   private static Pattern DOUBLE_LABEL_SEPARATOR_PATTERN = Pattern.compile(DOUBLE_LABEL_SEPARATOR);
 
@@ -51,6 +52,9 @@ public class LabelSubstitutionFF extends StatelessFF {
     if(hasDoubleLabelWithLabelSplittingSmoothingArgument(Arrays.asList(args))){        
         return  createDoubleLabelSmoothingLabelSubstiontionSmoothersList();
     }
+    else if(hasDoubleLabelWithLabelSplittingSmoothingOnlySingleLabelFeaturesArgument(Arrays.asList(args))){
+      return createDoubleLabelSmoothingOnlySingleLabelLabelSubstiontionSmoothersList();
+    }
     else{
       return createNoSmoothingLabelSubstiontionSmoothersList();
     }
@@ -63,19 +67,15 @@ public class LabelSubstitutionFF extends StatelessFF {
     }
     return false;
   }
+
+  public static boolean hasDoubleLabelWithLabelSplittingSmoothingOnlySingleLabelFeaturesArgument(List<String> args){
+    // The first argument args[0] is the name of the feature itself
+    if((args.size() > 1) && (args.get(1).equals(DOUBLE_LABEL_WITH_LABEL_SPLITTING_SMOOTHING_ONLY_SINGLE_LABEL_FEATURES_ARGUMENT))){
+      return true;
+    }
+    return false;
+  }
   
-  public static LabelSubstitutionSparseFF createStandardLabelSubstitutionSparseFF(
-      FeatureVector weights, JoshuaConfiguration joshuaConfiguration) {
-    return new LabelSubstitutionSparseFF(weights, getFeatureNameStandardSparseFeature(),
-        joshuaConfiguration, createNoSmoothingLabelSubstiontionSmoothersList());
-  }
-
-  public static LabelSubstitutionSparseFF createLabelSubstitutionFFDoubleLabelSparse(
-      FeatureVector weights, JoshuaConfiguration joshuaConfiguration) {
-    return new LabelSubstitutionSparseFF(weights, getFeatureNameStandardSparseFeature(),
-        joshuaConfiguration, createDoubleLabelSmoothingLabelSubstiontionSmoothersList());
-  }
-
   public static String getFeatureNameStandardFeature() {
     return STANDARD_LABEL_SUBSTITUTION_BASIC_FEATURE_FUNCTION_NAME;
   }
@@ -99,6 +99,18 @@ public class LabelSubstitutionFF extends StatelessFF {
   private static List<LabelSubstitutionLabelSmoother> createDoubleLabelSmoothingLabelSubstiontionSmoothersList() {
     List<LabelSubstitutionLabelSmoother> result = new ArrayList<LabelSubstitutionLabelSmoother>();
     result.add(new NoSmoothingLabelSubstitutionLabelSmoother());
+    result.add(new FirstSublabelOnlyLabelSubstitutionLabelSmoother());
+    result.add(new LastSublabelOnlyLabelSubstitutionLabelSmoother());
+    return result;
+  }  
+  
+  /**
+   * This method creates label smoothers that only produced features for the single labels, i.e. the 
+   * NoSmoothingLabelSubstitutionLabelSmoother is not added to the list
+   * @return
+   */
+  private static List<LabelSubstitutionLabelSmoother> createDoubleLabelSmoothingOnlySingleLabelLabelSubstiontionSmoothersList() {
+    List<LabelSubstitutionLabelSmoother> result = new ArrayList<LabelSubstitutionLabelSmoother>();
     result.add(new FirstSublabelOnlyLabelSubstitutionLabelSmoother());
     result.add(new LastSublabelOnlyLabelSubstitutionLabelSmoother());
     return result;
