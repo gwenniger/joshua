@@ -777,9 +777,18 @@ while (1) {
   # the end result should be (1) @NBEST_LIST, a list of lists; (2) @SCORE, a list of lists of lists
 
 
+  # In case we are continuing from a previous iteration, we need to initialize the sparse weights file for correctly (re-)saving the first config
+  if($continue && -e "./run$run.joshua.config"){
+    if(-e "./run$run.sparse-weights"){
+       # Gideon: This is nescessary because otherwise when  
+       $sparse_weights_file = "run" . ($run) . ".sparse-weights";
+       print STDERR "Gideon: Initializing sparse weights file for correct saving first configuration\n";
+    }
+  }
   # In case something dies later, we might wish to have a copy
   #  create_config($___CONFIG, "./run$run.moses.ini", $featlist, $run, (defined $devbleu ? $devbleu : "--not-estimated--"), $sparse_weights_file);
   create_config_joshua($___CONFIG, "./run$run.joshua.config", $featlist, $run, (defined $devbleu ? $devbleu : "--not-estimated--"), $sparse_weights_file);
+    
 
 
   # Save dense weights to simplify best dev recovery
