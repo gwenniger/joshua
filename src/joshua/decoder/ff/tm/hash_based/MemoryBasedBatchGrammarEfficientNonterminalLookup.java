@@ -25,9 +25,4 @@ public class MemoryBasedBatchGrammarEfficientNonterminalLookup extends MemoryBas
     return new MemoryBasedTrieEfficientNonterminalLookup();
   }
   
-  @Override
-  MemoryBasedTrieEfficientNonterminalLookup castTrieObject(Trie trie){
-    return (MemoryBasedTrieEfficientNonterminalLookup) trie;
-  }
-  
 }
