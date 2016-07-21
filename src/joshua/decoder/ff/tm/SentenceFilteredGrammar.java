@@ -4,6 +4,8 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map.Entry;
+
+import joshua.decoder.JoshuaConfiguration;
 import joshua.decoder.ff.tm.hash_based.ExtensionIterator;
 import joshua.decoder.ff.tm.hash_based.MemoryBasedBatchGrammar;
 import joshua.decoder.segment_file.Sentence;
@@ -351,6 +353,11 @@ public class SentenceFilteredGrammar extends MemoryBasedBatchGrammar {
     @Override
     public Iterator<Integer> getNonterminalExtensionIterator() {
       return new ExtensionIterator(children, false);
+    }
+
+    @Override
+    public Iterator<Integer> getNeitherOOVNorGoalLabelNonterminalExtensionIterator(JoshuaConfiguration joshuaConfiguration) {
+      throw new RuntimeException("Not implemented");
     }
   }
 }

@@ -4,6 +4,8 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 
+import joshua.decoder.JoshuaConfiguration;
+
 /**
  * An interface for trie-like data structures.
  * 
@@ -61,6 +63,16 @@ public interface Trie {
    * @return
    */
   Iterator<Integer> getNonterminalExtensionIterator();
+  
+ 
+  /**
+   * Returns an iterator over the trie node's extensions with nonterminal labels that are neither OOVs nor goal nodes.
+   * The Joshuaconfiguration argument is used to determine what are Goal and OOV nonterminals.
+   * 
+   * @return
+   */
+  Iterator<Integer> getNeitherOOVNorGoalLabelNonterminalExtensionIterator(JoshuaConfiguration joshuaConfiguration);
+  
   
   
   /**

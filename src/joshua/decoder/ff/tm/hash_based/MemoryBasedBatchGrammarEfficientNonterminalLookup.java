@@ -3,6 +3,7 @@ package joshua.decoder.ff.tm.hash_based;
 import java.io.IOException;
 
 import joshua.decoder.JoshuaConfiguration;
+import joshua.decoder.ff.tm.Trie;
 
 public class MemoryBasedBatchGrammarEfficientNonterminalLookup extends MemoryBasedBatchGrammar {
 
@@ -22,6 +23,11 @@ public class MemoryBasedBatchGrammarEfficientNonterminalLookup extends MemoryBas
   @Override
   protected MemoryBasedTrie createNewTrie(){
     return new MemoryBasedTrieEfficientNonterminalLookup();
+  }
+  
+  @Override
+  MemoryBasedTrieEfficientNonterminalLookup castTrieObject(Trie trie){
+    return (MemoryBasedTrieEfficientNonterminalLookup) trie;
   }
   
 }

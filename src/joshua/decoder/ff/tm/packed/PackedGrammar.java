@@ -305,6 +305,11 @@ public class PackedGrammar extends AbstractGrammar {
     public Iterator<Integer> getNonterminalExtensionIterator() {
       return new ExtensionIterator(lookup, false);
     }
+
+    @Override
+    public Iterator<Integer> getNeitherOOVNorGoalLabelNonterminalExtensionIterator(JoshuaConfiguration joshuaConfiguration) {
+      throw new RuntimeException("Not implemented");
+    }
   }
 
   public final class PackedSlice {
@@ -940,6 +945,11 @@ public class PackedGrammar extends AbstractGrammar {
           sb.append(String.format(" ||| %.3f", getEstimatedCost()));
           return sb.toString();
         }
+      }
+
+      @Override
+      public Iterator<Integer> getNeitherOOVNorGoalLabelNonterminalExtensionIterator(JoshuaConfiguration joshuaConfiguration) {
+        throw new RuntimeException("Not implemented");
       }
     }
   }

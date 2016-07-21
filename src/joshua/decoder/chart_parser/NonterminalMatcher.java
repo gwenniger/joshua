@@ -18,6 +18,8 @@ import joshua.decoder.chart_parser.DotNodeTypeCreater.DotNodeCreater;
 import joshua.decoder.chart_parser.DotNodeTypeCreater.DotNodeMultiLabelCreater;
 import joshua.decoder.ff.tm.Grammar;
 import joshua.decoder.ff.tm.Trie;
+import joshua.decoder.ff.tm.hash_based.MemoryBasedBatchGrammarEfficientNonterminalLookup;
+import joshua.decoder.ff.tm.hash_based.MemoryBasedTrieEfficientNonterminalLookup;
 import joshua.lattice.Lattice;
 import joshua.decoder.segment_file.Token;
 
@@ -164,13 +166,29 @@ public abstract class NonterminalMatcher <T extends DotNodeBase> {
     HashMap<Integer, ? extends Trie> childrenTbl = trie.getChildren();
     List<Trie> trieList = new ArrayList<Trie>();
 
-    Iterator<Integer> nonterminalIterator = trie.getNonterminalExtensionIterator();
-    while (nonterminalIterator.hasNext()) {
-      int nonterminalIndex = nonterminalIterator.next();
-      if (!isOOVLabelOrGoalLabel(Vocabulary.word(nonterminalIndex), joshuaConfiguration)) {
-        trieList.add(childrenTbl.get(nonterminalIndex));
+    if(trie instanceof MemoryBasedTrieEfficientNonterminalLookup){
+      
+      // Optimization: we directly obtain an iterator over nonterminals that are neither OOV nor goal nonterminals
+      Iterator<Integer> nonterminalIterator = trie.getNeitherOOVNorGoalLabelNonterminalExtensionIterator(joshuaConfiguration);
+      
+      while (nonterminalIterator.hasNext()) {
+        int nonterminalIndex = nonterminalIterator.next();      
+        trieList.add(childrenTbl.get(nonterminalIndex));      
       }
     }
+    else{    
+      Iterator<Integer> nonterminalIterator = trie.getNonterminalExtensionIterator();      
+      
+      while (nonterminalIterator.hasNext()) {
+        int nonterminalIndex = nonterminalIterator.next();      
+        if(!NonterminalMatcher.isOOVLabelOrGoalLabel(Vocabulary.word(nonterminalIndex), joshuaConfiguration)){        
+          trieList.add(childrenTbl.get(nonterminalIndex));      
+        }  
+      }
+    }
+      
+    
+
 
     return trieList;
 

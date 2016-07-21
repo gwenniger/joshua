@@ -4,6 +4,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 
+import joshua.decoder.JoshuaConfiguration;
 import joshua.decoder.ff.tm.RuleCollection;
 import joshua.decoder.ff.tm.Trie;
 
@@ -15,6 +16,7 @@ public class MemoryBasedTrie implements Trie {
   HashMap<Integer, MemoryBasedTrie> childrenTbl = null;
 
   public MemoryBasedTrie() {
+    System.err.println("MemoryBasedTrie constructur called");
   }
 
   @Override
@@ -66,5 +68,11 @@ public class MemoryBasedTrie implements Trie {
   @Override
   public Iterator<Integer> getNonterminalExtensionIterator() {
     return new ExtensionIterator(childrenTbl, false);
+  }
+
+  @Override
+  public Iterator<Integer> getNeitherOOVNorGoalLabelNonterminalExtensionIterator(JoshuaConfiguration joshuaConfiguration) {
+    System.err.println("Gideon: Non-specific method called!!!");
+    throw new RuntimeException("Not implemented");
   }
 }

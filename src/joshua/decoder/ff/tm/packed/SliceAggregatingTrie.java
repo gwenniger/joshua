@@ -12,6 +12,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
+import joshua.decoder.JoshuaConfiguration;
 import joshua.decoder.ff.FeatureFunction;
 import joshua.decoder.ff.tm.Rule;
 import joshua.decoder.ff.tm.RuleCollection;
@@ -212,6 +213,11 @@ public class SliceAggregatingTrie implements Trie, RuleCollection {
   @Override
   public int getArity() {
     return tries.get(0).getRuleCollection().getArity();
+  }
+
+  @Override
+  public Iterator<Integer> getNeitherOOVNorGoalLabelNonterminalExtensionIterator(JoshuaConfiguration joshuaConfiguration) {
+    throw new RuntimeException("Not implemented");
   }
 
 }
