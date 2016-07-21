@@ -16,7 +16,6 @@ public class MemoryBasedTrieEfficientNonterminalLookup extends MemoryBasedTrie {
 
   public MemoryBasedTrieEfficientNonterminalLookup() {
     super();
-    System.err.println("MemoryBasedTrieEfficientNonterminalLookup constructur called");
   }
 
   private boolean isNonterminalIndex(int nodeIndex) {

@@ -16,7 +16,6 @@ public class MemoryBasedTrie implements Trie {
   HashMap<Integer, MemoryBasedTrie> childrenTbl = null;
 
   public MemoryBasedTrie() {
-    System.err.println("MemoryBasedTrie constructur called");
   }
 
   @Override
