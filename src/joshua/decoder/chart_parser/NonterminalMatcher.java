@@ -169,7 +169,7 @@ public abstract class NonterminalMatcher <T extends DotNodeBase> {
     if(trie instanceof MemoryBasedTrieEfficientNonterminalLookup){
       
       // Optimization: we directly obtain an iterator over nonterminals that are neither OOV nor goal nonterminals
-      Iterator<Integer> nonterminalIterator = trie.getNeitherOOVNorGoalLabelNonterminalExtensionIterator(joshuaConfiguration);
+      Iterator<Integer> nonterminalIterator = ((MemoryBasedTrieEfficientNonterminalLookup)trie).getNeitherOOVNorGoalLabelNonterminalExtensionIterator(joshuaConfiguration);
       
       while (nonterminalIterator.hasNext()) {
         int nonterminalIndex = nonterminalIterator.next();      

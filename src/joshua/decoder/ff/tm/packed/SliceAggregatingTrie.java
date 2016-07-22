@@ -215,9 +215,4 @@ public class SliceAggregatingTrie implements Trie, RuleCollection {
     return tries.get(0).getRuleCollection().getArity();
   }
 
-  @Override
-  public Iterator<Integer> getNeitherOOVNorGoalLabelNonterminalExtensionIterator(JoshuaConfiguration joshuaConfiguration) {
-    throw new RuntimeException("Not implemented");
-  }
-
 }

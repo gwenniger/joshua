@@ -69,9 +69,4 @@ public class MemoryBasedTrie implements Trie {
     return new ExtensionIterator(childrenTbl, false);
   }
 
-  @Override
-  public Iterator<Integer> getNeitherOOVNorGoalLabelNonterminalExtensionIterator(JoshuaConfiguration joshuaConfiguration) {
-    System.err.println("Gideon: Non-specific method called!!!");
-    throw new RuntimeException("Not implemented");
-  }
 }

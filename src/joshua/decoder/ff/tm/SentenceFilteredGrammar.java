@@ -354,10 +354,6 @@ public class SentenceFilteredGrammar extends MemoryBasedBatchGrammar {
     public Iterator<Integer> getNonterminalExtensionIterator() {
       return new ExtensionIterator(children, false);
     }
-
-    @Override
-    public Iterator<Integer> getNeitherOOVNorGoalLabelNonterminalExtensionIterator(JoshuaConfiguration joshuaConfiguration) {
-      throw new RuntimeException("Not implemented");
-    }
+    
   }
 }

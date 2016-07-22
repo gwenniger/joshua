@@ -306,10 +306,6 @@ public class PackedGrammar extends AbstractGrammar {
       return new ExtensionIterator(lookup, false);
     }
 
-    @Override
-    public Iterator<Integer> getNeitherOOVNorGoalLabelNonterminalExtensionIterator(JoshuaConfiguration joshuaConfiguration) {
-      throw new RuntimeException("Not implemented");
-    }
   }
 
   public final class PackedSlice {
@@ -947,10 +943,6 @@ public class PackedGrammar extends AbstractGrammar {
         }
       }
 
-      @Override
-      public Iterator<Integer> getNeitherOOVNorGoalLabelNonterminalExtensionIterator(JoshuaConfiguration joshuaConfiguration) {
-        throw new RuntimeException("Not implemented");
-      }
     }
   }
 

@@ -64,7 +64,12 @@ public class MemoryBasedTrieEfficientNonterminalLookup extends MemoryBasedTrie {
     return this.neitherOOVNorGoalLabelNonterminalExtensions;
   }
 
-  @Override
+  /**
+   * Returns an iterator over the trie node's extensions with nonterminal labels that are neither OOVs nor goal nodes.
+   * The Joshuaconfiguration argument is used to determine what are Goal and OOV nonterminals.
+   * 
+   * @return
+   */  
   public Iterator<Integer> getNeitherOOVNorGoalLabelNonterminalExtensionIterator(JoshuaConfiguration joshuaConfiguration) {
     return new CachedNonterminalsIterator(getNeitherOOVNorGoalNonterminalsArray(joshuaConfiguration));
   }
