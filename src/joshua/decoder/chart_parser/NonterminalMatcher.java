@@ -158,7 +158,7 @@ public abstract class NonterminalMatcher <T extends DotNodeBase> {
         useSeparateCubePruningStatesForMatchingSubstitutions() || exploreAllPossibleLabelSubstitutionsForAllRulesInCubePruningInitialization();
   }
   
-  private static boolean isNonterminal(int wordIndex) {
+  public static boolean isNonterminal(int wordIndex) {
     return wordIndex < 0;
   }
 

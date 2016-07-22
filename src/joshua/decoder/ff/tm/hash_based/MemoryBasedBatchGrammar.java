@@ -171,6 +171,27 @@ public class MemoryBasedBatchGrammar extends AbstractGrammar {
     return new MemoryBasedTrie();
   }
 
+  
+  /**
+   * This method returns the representation of the rule as used 
+   * for storing the index for it in the Trie.
+   * In the  MemoryBasedBatchGrammarLabelsOutsideTrie implementation this 
+   * method is overwritten, to replace the labels for nonterminals 
+   * (except Goal and OOV) with the Hiero X label. 
+   * This makes the decoding for fuzzy matching much faster, since the labels
+   * are ignored anyhow for purpose of matching
+   * (except in case of Goal and OOV which must be strictly 
+   * matched), so avoiding a blowup of the number of Trie paths because of 
+   * labeling is possible and expected to increase efficiency a lot, especially when 
+   * many labels are used.
+   * 
+   * @param rule
+   * @return
+   */
+  protected Rule getRuleForIndexingInTrie(Rule rule) {
+    return rule;
+  }
+  
 
   /**
    * Adds a rule to the grammar.
@@ -191,7 +212,10 @@ public class MemoryBasedBatchGrammar extends AbstractGrammar {
 
     // === identify the position, and insert the trie nodes as necessary
     MemoryBasedTrie pos = root;
-    int[] french = rule.getFrench();
+    
+    Rule ruleForIndexingInTrie = getRuleForIndexingInTrie(rule);
+    
+    int[] french = ruleForIndexingInTrie.getFrench();
 
     maxSourcePhraseLength = Math.max(maxSourcePhraseLength, french.length);
 
@@ -219,9 +243,10 @@ public class MemoryBasedBatchGrammar extends AbstractGrammar {
 
     // === add the rule into the trie node
     if (!pos.hasRules()) {
-      pos.ruleBin = new MemoryBasedRuleBin(rule.getArity(), rule.getFrench());
+      pos.ruleBin = new MemoryBasedRuleBin(ruleForIndexingInTrie.getArity(), ruleForIndexingInTrie.getFrench());
       this.qtyRuleBins++;
     }
+    // We add the actual rule to the rule bin
     pos.ruleBin.addRule(rule);
   }
 

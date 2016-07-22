@@ -44,7 +44,7 @@ public class JoshuaConfiguration {
   public String default_non_terminal = FormatUtils.markup("X");
   public String goal_symbol = FormatUtils.markup("GOAL");
 
-  public static String STANDARD_GLUE_RULE_RIGHT_HAND_SIDE_LABEL = FormatUtils.markup("X");
+  public static final String STANDARD_GLUE_RULE_RIGHT_HAND_SIDE_LABEL = FormatUtils.markup("X");
   
   /*
    * A list of OOV symbols in the form
@@ -200,8 +200,10 @@ public class JoshuaConfiguration {
    * nonterminal may be substituted for any other nonterminal (except for OOV and GOAL)
    */
   public boolean fuzzy_matching = false;
+  public boolean remove_labels_inside_grammar_trie_for_more_efficient_fuzzy_matching = false;
 
   public static final String SOFT_SYNTACTIC_CONSTRAINT_DECODING_PROPERTY_NAME = "fuzzy_matching";
+  public static final String REMOVE_LABELS_INSIDE_GRAMMAR_TRIE_FOR_MORE_EFFICIENT_FUZZY_MATCHING_PROPERTY_NAME = "remove_labels_inside_grammar_trie_for_more_efficient_fuzzy_matching";
   
   
   public boolean explore_all_labels_for_glue_rules_in_cube_pruning_initialization;
@@ -580,7 +582,14 @@ public class JoshuaConfiguration {
             fuzzy_matching = Boolean.parseBoolean(fds[1]);
             logger.finest(String.format(SOFT_SYNTACTIC_CONSTRAINT_DECODING_PROPERTY_NAME + ": %s", fuzzy_matching));
 
-          }else if (parameter
+          }
+          else if (parameter
+            .equals(normalize_key(REMOVE_LABELS_INSIDE_GRAMMAR_TRIE_FOR_MORE_EFFICIENT_FUZZY_MATCHING_PROPERTY_NAME))) {
+          remove_labels_inside_grammar_trie_for_more_efficient_fuzzy_matching = Boolean.parseBoolean(fds[1]);
+          logger.finest(String.format(REMOVE_LABELS_INSIDE_GRAMMAR_TRIE_FOR_MORE_EFFICIENT_FUZZY_MATCHING_PROPERTY_NAME + ": %s", remove_labels_inside_grammar_trie_for_more_efficient_fuzzy_matching));
+          }
+                  
+          else if (parameter
               .equals(normalize_key(SEPARATE_CUBE_PRUNING_STATES_MATCHING_SUBSTITUTIONS_PROPERTY_NAME))) {
             separate_cube_pruning_states_for_matching_substitutions = Boolean.parseBoolean(fds[1]);
             logger.finest(String.format(SEPARATE_CUBE_PRUNING_STATES_MATCHING_SUBSTITUTIONS_PROPERTY_NAME + ": %s",  separate_cube_pruning_states_for_matching_substitutions));

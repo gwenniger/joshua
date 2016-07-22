@@ -13,6 +13,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+
 import joshua.corpus.Vocabulary;
 import joshua.decoder.ff.FeatureVector;
 import joshua.decoder.JoshuaConfiguration.INPUT_TYPE;
@@ -26,6 +27,7 @@ import joshua.decoder.ff.tm.Trie;
 import joshua.decoder.ff.tm.format.HieroFormatReader;
 import joshua.decoder.ff.tm.hash_based.MemoryBasedBatchGrammar;
 import joshua.decoder.ff.tm.hash_based.MemoryBasedBatchGrammarEfficientNonterminalLookup;
+import joshua.decoder.ff.tm.hash_based.MemoryBasedBatchGrammarLabelsOutsideTrie;
 import joshua.decoder.ff.tm.packed.PackedGrammar;
 import joshua.decoder.io.JSONMessage;
 import joshua.decoder.io.TranslationRequestStream;
@@ -762,11 +764,27 @@ public class Decoder {
                  
             // thrax, hiero, samt
             if(joshuaConfiguration.fuzzy_matching){
-              System.err.println(">>>Gideon: Loading fuzzy matching grammar ... ");
-              // Create a MemoryBasedBatchGrammar with efficient nonterminal lookup. This 
-             // is important to make the fuzzy_matching decoding go fast
-             grammar = new MemoryBasedBatchGrammarEfficientNonterminalLookup(type, path, owner,
-                 joshuaConfiguration.default_non_terminal, span_limit,joshuaConfiguration);
+              
+              if(joshuaConfiguration.remove_labels_inside_grammar_trie_for_more_efficient_fuzzy_matching){
+                System.err.println(">>>Gideon: Loading fuzzy matching grammar with labels removed inside trie for added efficiency ... ");
+               
+                // More efficient form of fuzzy matching implementation                 
+                grammar = new MemoryBasedBatchGrammarLabelsOutsideTrie(type, path, owner,
+                joshuaConfiguration.default_non_terminal, span_limit,joshuaConfiguration);
+              }
+              else{
+
+                // Create a MemoryBasedBatchGrammar with efficient nonterminal lookup. This 
+               // is important to make the fuzzy_matching decoding go fast
+                System.err.println(">>>Gideon: Loading fuzzy matching grammar ... ");
+                System.err.println(">>>WARNING: Using old, less efficient fuzzy matching implementation keeping labels inside grammar Trie ... ");
+                  grammar = new MemoryBasedBatchGrammarEfficientNonterminalLookup(type, path, owner,
+                  joshuaConfiguration.default_non_terminal, span_limit,joshuaConfiguration);    
+              }
+              
+              
+            
+             
              System.err.println(">>>Gideon: Loaded ... ");
              }
             else{
