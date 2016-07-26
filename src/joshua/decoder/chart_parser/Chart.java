@@ -592,10 +592,6 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
         int[] nextRanks = new int[state.ranks.length];
         System.arraycopy(state.ranks, 0, nextRanks, 0, state.ranks.length);
         nextRanks[k]++;
-
-        if(config.num_translation_options > 0){
-          throw new RuntimeException("Wanted all translation options!!!");
-        }
         
         /*
          * We might have reached the end of something (list of rules or tail
