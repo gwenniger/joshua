@@ -378,6 +378,10 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
   private void printRuleLabelingTypesInfoDebugging(List<Rule> rules){
     List<Integer> firstOccurencesRuleLabelings = determineFirstRuleLabelingTypeOccurenceIndices(rules);
     System.err.println(">>> Found: " + firstOccurencesRuleLabelings.size() + " rule labeling types in " + rules.size() + " rules, indices first occurences unique labelings: " + firstOccurencesRuleLabelings);
+    System.err.println("Rules for first occurrences distinct labelings:" );
+    for(int ruleIndex : firstOccurencesRuleLabelings){
+      System.err.println("\tIndex: " + ruleIndex + " rule: " + rules.get(ruleIndex));
+    }
   }
   
   private List<Integer> determineFirstRuleLabelingTypeOccurenceIndices(List<Rule> rules){
