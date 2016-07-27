@@ -7,6 +7,20 @@ import joshua.decoder.JoshuaConfiguration;
 import joshua.decoder.chart_parser.NonterminalMatcher;
 import joshua.decoder.ff.tm.Rule;
 
+/**
+ * 
+ * A MemoryBasedBatchGrammar in which the labels are removed inside the Trie.
+ * By removing the labels (except Goal and OOV) which are ignored anyhow in the matching,
+ * the process of finding the matching grammar Trie nodes in the dotchart becomes much 
+ * faster, and no longer slows down with an increase in the number of labels.
+ * This is most likely the fastest possible implementation structure, 
+ * for which decoding should be approximately as fast as for Hiero itself, except for the added overhead of 
+ * computing the label substitution features.
+ * 
+ * @author gemaille
+ *
+ */
+
 public class MemoryBasedBatchGrammarLabelsOutsideTrie extends MemoryBasedBatchGrammar {
 
   // We obtain the Hiero label key once from the Vocabulary, and then reuse it for efficiency

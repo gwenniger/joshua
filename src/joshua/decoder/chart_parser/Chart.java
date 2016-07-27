@@ -2,6 +2,7 @@ package joshua.decoder.chart_parser;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.PriorityQueue;
@@ -228,6 +229,12 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
           continue;
 
         List<Rule> rules = ruleCollection.getSortedRules(this.featureFunctions);
+        
+        //System.err.println("\n");
+        //printRulesForDebugging(rules);
+        printRuleLabelingTypesInfoDebugging(rules);
+        //System.err.println("\n");
+        
         SourcePath sourcePath = dotNode.getSourcePath();
 
         if (null == rules || rules.size() == 0)
@@ -347,6 +354,63 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
 
     applyCubePruning(i, j, candidates);
   }
+  
+  private void printRulesForDebugging(List<Rule> rules){
+    System.err.println(">>>Printing the rules for dotnode");
+    int ruleNum = 0;
+    for(Rule rule : rules){
+      System.err.println("Rule " + ruleNum + " : "+ rule);
+      ruleNum++;
+    }
+    System.err.println("<<<<Printing the rules for dotnode");
+  }
+  
+  /**
+   * A method for debugging purposes, that prints the number of rules and the number of 
+   * distinct rule labelings for those rules, as well as the indices of the first occurrences 
+   * of the distinct rule labelings.
+   * The motivation for this is to get some idea about how many different labelings actually 
+   * occur and how they are spread out over the list of sorted rules. 
+   *  
+   *   
+   * @param rules
+   */
+  private void printRuleLabelingTypesInfoDebugging(List<Rule> rules){
+    List<Integer> firstOccurencesRuleLabelings = determineFirstRuleLabelingTypeOccurenceIndices(rules);
+    System.err.println(">>> Found: " + firstOccurencesRuleLabelings.size() + " rule labeling types in " + rules.size() + " rules, indices first occurences unique labelings: " + firstOccurencesRuleLabelings);
+  }
+  
+  private List<Integer> determineFirstRuleLabelingTypeOccurenceIndices(List<Rule> rules){
+    if(rules.size() == 0){
+      return Collections.emptyList();
+    }
+    
+    List<Integer> result = new ArrayList<Integer>();
+    
+    HashSet<List<Integer>> uniqueLabelingSet = new HashSet<List<Integer>>();
+   
+    
+    int ruleIndex = 0;
+    for(Rule rule : rules){
+      int lhs = rule.getLHS();
+      int[] nonterminals = rule.getForeignNonTerminals();
+      
+      List<Integer> ruleLabelRepresentation = new ArrayList<Integer>();
+      ruleLabelRepresentation.add(lhs);
+      for(Integer nonterminalLabelKey : nonterminals){
+        ruleLabelRepresentation.add(nonterminalLabelKey);
+      }
+      
+      if(!uniqueLabelingSet.contains(ruleLabelRepresentation)){
+        uniqueLabelingSet.add(ruleLabelRepresentation);
+        result.add(ruleIndex);
+      }
+      ruleIndex++;
+    }
+    
+    return result;
+  }
+  
 
   /**
    * Add separate candidates for matching and non-matching substitutions.
@@ -607,6 +671,11 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
         
         /* Use the updated ranks to assign the next rule and tail node. */
         Rule nextRule = rules.get(nextRanks[0] - 1);
+        //String nextRanksString = "";
+        //for(int index = 0; index < nextRanks.length ; index++){
+        //  nextRanksString += "[" + nextRanks[index] + "]" + " ";         
+        //}
+        //System.err.println(">>>nextRanks: " + nextRanksString + " Exploring rule " + (nextRanks[0] - 1) +  " for cube pruning state"  +  nextRule);
         
         List<ValidAntNodeComputer<T>> validAntNodeComputers = state.getValidAntNodeComputers();
         NextAntNodesPreparer<T> cubePruneStatePreparer = NextAntNodesPreparer.createNextAntNodesPreparer(nextRanks,validAntNodeComputers , this);
