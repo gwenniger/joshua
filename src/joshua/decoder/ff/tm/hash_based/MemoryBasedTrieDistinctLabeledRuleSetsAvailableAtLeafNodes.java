@@ -7,6 +7,7 @@ import java.util.Map;
 
 import org.junit.Assert;
 
+import joshua.corpus.Vocabulary;
 import joshua.decoder.ff.FeatureFunction;
 import joshua.decoder.ff.tm.Rule;
 import joshua.decoder.ff.tm.RuleCollection;
@@ -52,8 +53,10 @@ public class MemoryBasedTrieDistinctLabeledRuleSetsAvailableAtLeafNodes extends
       String ruleLabelStringRepresentation = getRuleLabelStringRepresentation(rule);
       // Create a new list of rules for the rule label string represenation if not present yet
       if (!rulesMap.containsKey(ruleLabelStringRepresentation)) {
+        //System.err.println(">>> Found new rule source side: " + ruleLabelStringRepresentation + "  creating new rules list.");
         rulesMap.put(ruleLabelStringRepresentation, new ArrayList<Rule>());
       }
+      //System.err.println(">>> Adding rule " + rule + " to list");
       rulesMap.get(ruleLabelStringRepresentation).add(rule);
     }
     return rulesMap;
@@ -88,9 +91,9 @@ public class MemoryBasedTrieDistinctLabeledRuleSetsAvailableAtLeafNodes extends
 
   private String getRuleLabelStringRepresentation(Rule rule) {
     String result = "";
-    result += "LHS:+" + rule.getLHS();
+    result += "LHS: " + Vocabulary.word(rule.getLHS());
     for (Integer nonterminalKey : rule.getForeignNonTerminals()) {
-      result += "-nont: " + nonterminalKey;
+      result += "-nont: " + Vocabulary.word(nonterminalKey);
     }
     return result;
   }

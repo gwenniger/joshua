@@ -228,16 +228,19 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
         
         if(useFuzzyMatchingDecodingWithLabelsRemovedInsideTrieButAllDistinctRuleLabelingsExploredInCubePruningInitialization() &&
             (dotNode.getTrieNode() instanceof MemoryBasedTrieDistinctLabeledRuleSetsAvailableAtLeafNodes)){
-          System.err.println(">>> Exploring all distinct labelings rule in cube pruning initialization");
+          //System.err.println(">>> Exploring all distinct labelings rule in cube pruning initialization");
           MemoryBasedTrieDistinctLabeledRuleSetsAvailableAtLeafNodes trie = (MemoryBasedTrieDistinctLabeledRuleSetsAvailableAtLeafNodes) dotNode.getTrieNode();
           
           if(trie.hasRules()){
             List<RuleCollection> distinctLabelingRuleCollectionsList = trie.getDistinctLabeledRuleSetsSorted(this.featureFunctions);
+            
+            //System.err.println(">>> Found " + distinctLabelingRuleCollectionsList.size() + " different rule labelings for the rule");
+            
             for(RuleCollection ruleCollection : distinctLabelingRuleCollectionsList){
               createInitialCubePruningStatesForRuleCollection(candidates, ruleCollection, dotNode, i, j);
             }
           }
-          System.err.println("<<< Exploration finished");
+          //System.err.println("<<< Exploration finished");
         }          
         else{
           RuleCollection ruleCollection = dotNode.getRuleCollection();
@@ -266,7 +269,7 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
     
     //System.err.println("\n");
     //printRulesForDebugging(rules);
-    printRuleLabelingTypesInfoDebugging(rules);
+    //printRuleLabelingTypesInfoDebugging(rules);
     //System.err.println("\n");
     
     SourcePath sourcePath = dotNode.getSourcePath();

@@ -772,6 +772,7 @@ public class Decoder {
                 if(joshuaConfiguration.explore_all_distinct_labled_rule_versions_in_cube_pruning_initialization){
                  // More efficient form of fuzzy matching implementation, that still preserves 
                   // the exploration of all distinct rule labeling options during cube pruning initialization 
+                  System.err.println(">>>Gideon: Exploring every distinct labeling of every Hiero source-side rule type in cube pruning initialization... ");
                   grammar = new MemoryBasedBatchGrammarDistinctLabeledRuleSetsAvailableAtLeafNodes(type, path, owner,
                      joshuaConfiguration.default_non_terminal, span_limit,joshuaConfiguration); 
                 }
