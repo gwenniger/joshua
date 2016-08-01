@@ -26,6 +26,7 @@ import joshua.decoder.ff.tm.Rule;
 import joshua.decoder.ff.tm.Trie;
 import joshua.decoder.ff.tm.format.HieroFormatReader;
 import joshua.decoder.ff.tm.hash_based.MemoryBasedBatchGrammar;
+import joshua.decoder.ff.tm.hash_based.MemoryBasedBatchGrammarDistinctLabeledRuleSetsAvailableAtLeafNodes;
 import joshua.decoder.ff.tm.hash_based.MemoryBasedBatchGrammarEfficientNonterminalLookup;
 import joshua.decoder.ff.tm.hash_based.MemoryBasedBatchGrammarLabelsOutsideTrie;
 import joshua.decoder.ff.tm.packed.PackedGrammar;
@@ -768,9 +769,17 @@ public class Decoder {
               if(joshuaConfiguration.remove_labels_inside_grammar_trie_for_more_efficient_fuzzy_matching){
                 System.err.println(">>>Gideon: Loading fuzzy matching grammar with labels removed inside trie for added efficiency ... ");
                
-                // More efficient form of fuzzy matching implementation                 
-                grammar = new MemoryBasedBatchGrammarLabelsOutsideTrie(type, path, owner,
-                joshuaConfiguration.default_non_terminal, span_limit,joshuaConfiguration);
+                if(joshuaConfiguration.explore_all_distinct_labled_rule_versions_in_cube_pruning_initialization){
+                 // More efficient form of fuzzy matching implementation, that still preserves 
+                  // the exploration of all distinct rule labeling options during cube pruning initialization 
+                  grammar = new MemoryBasedBatchGrammarDistinctLabeledRuleSetsAvailableAtLeafNodes(type, path, owner,
+                     joshuaConfiguration.default_non_terminal, span_limit,joshuaConfiguration); 
+                }
+                else{
+                  // More efficient form of fuzzy matching implementation                 
+                  grammar = new MemoryBasedBatchGrammarLabelsOutsideTrie(type, path, owner,
+                      joshuaConfiguration.default_non_terminal, span_limit,joshuaConfiguration);
+                } 
               }
               else{
 

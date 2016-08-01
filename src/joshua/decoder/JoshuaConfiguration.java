@@ -201,9 +201,11 @@ public class JoshuaConfiguration {
    */
   public boolean fuzzy_matching = false;
   public boolean remove_labels_inside_grammar_trie_for_more_efficient_fuzzy_matching = false;
+  public boolean explore_all_distinct_labled_rule_versions_in_cube_pruning_initialization = false;
 
   public static final String SOFT_SYNTACTIC_CONSTRAINT_DECODING_PROPERTY_NAME = "fuzzy_matching";
   public static final String REMOVE_LABELS_INSIDE_GRAMMAR_TRIE_FOR_MORE_EFFICIENT_FUZZY_MATCHING_PROPERTY_NAME = "remove_labels_inside_grammar_trie_for_more_efficient_fuzzy_matching";
+  public static final String EXPLORE_ALL_DISTINCT_LABLED_RULE_VERSIONS_IN_CUBE_PRUNING_INITIALIZATION_PROPERTY_NAME = "explore_all_distinct_labled_rule_versions_in_cube_pruning_initialization";
   
   
   public boolean explore_all_labels_for_glue_rules_in_cube_pruning_initialization;
@@ -588,7 +590,13 @@ public class JoshuaConfiguration {
           remove_labels_inside_grammar_trie_for_more_efficient_fuzzy_matching = Boolean.parseBoolean(fds[1]);
           logger.finest(String.format(REMOVE_LABELS_INSIDE_GRAMMAR_TRIE_FOR_MORE_EFFICIENT_FUZZY_MATCHING_PROPERTY_NAME + ": %s", remove_labels_inside_grammar_trie_for_more_efficient_fuzzy_matching));
           }
-                  
+         
+          else if (parameter
+              .equals(normalize_key(EXPLORE_ALL_DISTINCT_LABLED_RULE_VERSIONS_IN_CUBE_PRUNING_INITIALIZATION_PROPERTY_NAME))) {
+            explore_all_distinct_labled_rule_versions_in_cube_pruning_initialization = Boolean.parseBoolean(fds[1]);
+            logger.finest(String.format(EXPLORE_ALL_DISTINCT_LABLED_RULE_VERSIONS_IN_CUBE_PRUNING_INITIALIZATION_PROPERTY_NAME + ": %s", explore_all_distinct_labled_rule_versions_in_cube_pruning_initialization));
+          }
+          
           else if (parameter
               .equals(normalize_key(SEPARATE_CUBE_PRUNING_STATES_MATCHING_SUBSTITUTIONS_PROPERTY_NAME))) {
             separate_cube_pruning_states_for_matching_substitutions = Boolean.parseBoolean(fds[1]);

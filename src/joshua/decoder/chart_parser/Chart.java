@@ -30,6 +30,7 @@ import joshua.decoder.ff.tm.Grammar;
 import joshua.decoder.ff.tm.Rule;
 import joshua.decoder.ff.tm.RuleCollection;
 import joshua.decoder.ff.tm.Trie;
+import joshua.decoder.ff.tm.hash_based.MemoryBasedTrieDistinctLabeledRuleSetsAvailableAtLeafNodes;
 import joshua.decoder.ff.tm.hash_based.MemoryBasedBatchGrammar;
 import joshua.decoder.hypergraph.HGNode;
 import joshua.decoder.hypergraph.HyperGraph;
@@ -223,136 +224,165 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
 
       // for each rule with applicable rules
       for (T dotNode : dotcharts[g].getDotCell(i, j).getDotNodes()) {
-        RuleCollection ruleCollection = dotNode.getRuleCollection();
-
-        if (ruleCollection == null)
-          continue;
-
-        List<Rule> rules = ruleCollection.getSortedRules(this.featureFunctions);
+       
         
-        //System.err.println("\n");
-        //printRulesForDebugging(rules);
-        printRuleLabelingTypesInfoDebugging(rules);
-        //System.err.println("\n");
-        
-        SourcePath sourcePath = dotNode.getSourcePath();
-
-        if (null == rules || rules.size() == 0)
-          continue;
-
-        int arity = ruleCollection.getArity();
-        
-
-        if (ruleCollection.getArity() == 0) {
-          /*
-           * The total number of arity-0 items (pre-terminal rules) that we add
-           * is controlled by num_translation_options in the configuration.
-           * 
-           * We limit the translation options per DotNode; that is, per LHS.
-           */
-          int numTranslationsAdded = 0;
-
-          /* Terminal productions are added directly to the chart */
-          for (Rule rule : rules) {
-
-            if (config.num_translation_options > 0
-                && numTranslationsAdded >= config.num_translation_options) {
-              break;
-            }
-
-            ComputeNodeResult result = new ComputeNodeResult(this.featureFunctions, rule, null, i,
-                j, sourcePath, this.sentence);
-
-            if (stateConstraint == null || stateConstraint.isLegal(result.getDPStates())) {
-              getCell(i, j).addHyperEdgeInCell(result, rule, i, j, null, sourcePath, true);
-              numTranslationsAdded++;
+        if(useFuzzyMatchingDecodingWithLabelsRemovedInsideTrieButAllDistinctRuleLabelingsExploredInCubePruningInitialization() &&
+            (dotNode.getTrieNode() instanceof MemoryBasedTrieDistinctLabeledRuleSetsAvailableAtLeafNodes)){
+          System.err.println(">>> Exploring all distinct labelings rule in cube pruning initialization");
+          MemoryBasedTrieDistinctLabeledRuleSetsAvailableAtLeafNodes trie = (MemoryBasedTrieDistinctLabeledRuleSetsAvailableAtLeafNodes) dotNode.getTrieNode();
+          
+          if(trie.hasRules()){
+            List<RuleCollection> distinctLabelingRuleCollectionsList = trie.getDistinctLabeledRuleSetsSorted(this.featureFunctions);
+            for(RuleCollection ruleCollection : distinctLabelingRuleCollectionsList){
+              createInitialCubePruningStatesForRuleCollection(candidates, ruleCollection, dotNode, i, j);
             }
           }
-        } else {
-          /* Productions with rank > 0 are subject to cube pruning */
-
-          Rule bestRule = rules.get(0);
-
-
-          if(peformFuzzyMatching()){                        
-            if(!(dotNode instanceof DotNodeMultiLabel)){
-              throw new RuntimeException("DotNode not instance of DotNodeMultiLabel!");
-            }         
-            
-            @SuppressWarnings("unchecked")
-            
-            List<SuperNodeAlternativesSpecification> superNodeAlterNativeSpecifiactions = (List<SuperNodeAlternativesSpecification>) dotNode.getAntSuperNodes();
-            
-            List<List<SuperNode>> superNodes = new ArrayList<List<SuperNode>>();
-            for(SuperNodeAlternativesSpecification superNodeAlternativesSpecification : superNodeAlterNativeSpecifiactions){
-              superNodes.add(superNodeAlternativesSpecification.getAlternativeSuperNodes());
-            }           
-            
-            //Assert.assertFalse(superNodes.isEmpty());
-            //logger.info("superNodes.get(0).size();" +superNodes.get(0).size()); 
-            
-            //List<SuperNode> firstLabelCombination = unpackFirstCombination(superNodes);
-            //TODO
-            // 1: Compute the feature weight for the first label combination
-            // 2. Compute the maximum possible feature weight across labeled variants
-            // of the same rule based on joshuaConfiguration.featureScorePredictor
-            // 3. Compute the position in the queue for the hypothetical maximum 
-            //    scoring labeled variant.
-            // 4. If the best achievable position in the queue for the hypothetical
-            //    maximum scoring labeled variant is beyond POP_LIMIT, then non          
-            //    of the labeled variants will ever be added to the chart in the next step
-            //    so we can safely discard the whole set to save considerable computation.
-            
-            
-            //List<List<SuperNode>>   unpackedSuperNodeLists =  unpackAllPossibleTCombinations(superNodes);
-            //Assert.assertFalse(unpackedSuperNodeLists.isEmpty());
-            
-            //logger.info(" Looping over unpackedSuperNodeList");
-            //for(List<SuperNode> unpackedSuperNodeList : unpackedSuperNodeLists){                                                   
-              //Assert.assertEquals(superNodes.size(),unpackedSuperNodeList.size());
-              //addNewCubePruneState(i, j, rules, dotNode, bestRule,unpackedSuperNodeList, arity, sourcePath, candidates, visitedStates);
-              
-              //addNewCandidate(i,j,candidates, rules, bestRule, sourcePath, dotNode, unpackedSuperNodeList);          
-           
-            //}   
-            
-          
-            
-            if(exploreAllPossibleLabelSubstitutionsForAllRulesInCubePruningInitialization()){
-           
-            
-             List<List<SuperNode>> superNodeCombinationsList = unpackAllPossibleTCombinations(superNodes);
-             // Add a separate cube pruning state fore every label substitution combination
-               for(List<SuperNode> superNodeCombination : superNodeCombinationsList){
-                  addNewCandidateForSelectedSuperNodes(arity, j, candidates, rules, bestRule, sourcePath, (DotNodeMultiLabel) dotNode, superNodeCombination);
-               }
-             
-            }                   
-            else if(useSeparateCubePruningStatesForMatchingSubstitutions()){
-              if(exploreAllLabelsForGlueRulesInCubePruningInitialization() && bestRule.isGlueRule(this.config)){               
-                addSeparateGlueRuleCandidatesForEachSubstitutedToLabel(arity, j, candidates, rules, bestRule, sourcePath, (DotNodeMultiLabel) dotNode); 
-              }
-              else{
-                addSeparateCandidatesForMatchingAndNonMatchingSubstitutions(arity, j, candidates, rules, bestRule, sourcePath, dotNode);
-              }
-            }
-            else{
-              addNewCandidate(i,j,candidates, rules, bestRule, sourcePath, dotNode,null);
-            }              
-          }
-          else{
-          
-            //@SuppressWarnings("unchecked")
-            //List<SuperNode> superNodes = (List<SuperNode>) dotNode.getAntSuperNodes();
-            
-            //addNewCandidate(i,j,candidates, rules, bestRule, sourcePath, dotNode, superNodes);
-            addNewCandidate(i,j,candidates, rules, bestRule, sourcePath, dotNode,null);
+          System.err.println("<<< Exploration finished");
+        }          
+        else{
+          RuleCollection ruleCollection = dotNode.getRuleCollection();
+          createInitialCubePruningStatesForRuleCollection(candidates, ruleCollection, dotNode, i, j);
         }
-        }
+        
+        
       }
+
     }
 
     applyCubePruning(i, j, candidates);
+  }
+  
+  private boolean useFuzzyMatchingDecodingWithLabelsRemovedInsideTrieButAllDistinctRuleLabelingsExploredInCubePruningInitialization(){
+    return config.fuzzy_matching && config.remove_labels_inside_grammar_trie_for_more_efficient_fuzzy_matching &&
+    config.explore_all_distinct_labled_rule_versions_in_cube_pruning_initialization;
+  }
+  
+  public void createInitialCubePruningStatesForRuleCollection( PriorityQueue<CubePruneStateBase<T>> candidates,
+      RuleCollection ruleCollection,T dotNode, int i, int j){
+    if (ruleCollection == null)
+      return;
+
+    List<Rule> rules = ruleCollection.getSortedRules(this.featureFunctions);
+    
+    //System.err.println("\n");
+    //printRulesForDebugging(rules);
+    printRuleLabelingTypesInfoDebugging(rules);
+    //System.err.println("\n");
+    
+    SourcePath sourcePath = dotNode.getSourcePath();
+
+    if (null == rules || rules.size() == 0)
+      return;
+
+    int arity = ruleCollection.getArity();
+    
+
+    if (ruleCollection.getArity() == 0) {
+      /*
+       * The total number of arity-0 items (pre-terminal rules) that we add
+       * is controlled by num_translation_options in the configuration.
+       * 
+       * We limit the translation options per DotNode; that is, per LHS.
+       */
+      int numTranslationsAdded = 0;
+
+      /* Terminal productions are added directly to the chart */
+      for (Rule rule : rules) {
+
+        if (config.num_translation_options > 0
+            && numTranslationsAdded >= config.num_translation_options) {
+          break;
+        }
+
+        ComputeNodeResult result = new ComputeNodeResult(this.featureFunctions, rule, null, i,
+            j, sourcePath, this.sentence);
+
+        if (stateConstraint == null || stateConstraint.isLegal(result.getDPStates())) {
+          getCell(i, j).addHyperEdgeInCell(result, rule, i, j, null, sourcePath, true);
+          numTranslationsAdded++;
+        }
+      }
+    } else {
+      /* Productions with rank > 0 are subject to cube pruning */
+
+      Rule bestRule = rules.get(0);
+
+
+      if(peformFuzzyMatching()){                        
+        if(!(dotNode instanceof DotNodeMultiLabel)){
+          throw new RuntimeException("DotNode not instance of DotNodeMultiLabel!");
+        }         
+        
+        @SuppressWarnings("unchecked")
+        
+        List<SuperNodeAlternativesSpecification> superNodeAlterNativeSpecifiactions = (List<SuperNodeAlternativesSpecification>) dotNode.getAntSuperNodes();
+        
+        List<List<SuperNode>> superNodes = new ArrayList<List<SuperNode>>();
+        for(SuperNodeAlternativesSpecification superNodeAlternativesSpecification : superNodeAlterNativeSpecifiactions){
+          superNodes.add(superNodeAlternativesSpecification.getAlternativeSuperNodes());
+        }           
+        
+        //Assert.assertFalse(superNodes.isEmpty());
+        //logger.info("superNodes.get(0).size();" +superNodes.get(0).size()); 
+        
+        //List<SuperNode> firstLabelCombination = unpackFirstCombination(superNodes);
+        //TODO
+        // 1: Compute the feature weight for the first label combination
+        // 2. Compute the maximum possible feature weight across labeled variants
+        // of the same rule based on joshuaConfiguration.featureScorePredictor
+        // 3. Compute the position in the queue for the hypothetical maximum 
+        //    scoring labeled variant.
+        // 4. If the best achievable position in the queue for the hypothetical
+        //    maximum scoring labeled variant is beyond POP_LIMIT, then non          
+        //    of the labeled variants will ever be added to the chart in the next step
+        //    so we can safely discard the whole set to save considerable computation.
+        
+        
+        //List<List<SuperNode>>   unpackedSuperNodeLists =  unpackAllPossibleTCombinations(superNodes);
+        //Assert.assertFalse(unpackedSuperNodeLists.isEmpty());
+        
+        //logger.info(" Looping over unpackedSuperNodeList");
+        //for(List<SuperNode> unpackedSuperNodeList : unpackedSuperNodeLists){                                                   
+          //Assert.assertEquals(superNodes.size(),unpackedSuperNodeList.size());
+          //addNewCubePruneState(i, j, rules, dotNode, bestRule,unpackedSuperNodeList, arity, sourcePath, candidates, visitedStates);
+          
+          //addNewCandidate(i,j,candidates, rules, bestRule, sourcePath, dotNode, unpackedSuperNodeList);          
+       
+        //}   
+        
+      
+        
+        if(exploreAllPossibleLabelSubstitutionsForAllRulesInCubePruningInitialization()){
+       
+        
+         List<List<SuperNode>> superNodeCombinationsList = unpackAllPossibleTCombinations(superNodes);
+         // Add a separate cube pruning state fore every label substitution combination
+           for(List<SuperNode> superNodeCombination : superNodeCombinationsList){
+              addNewCandidateForSelectedSuperNodes(arity, j, candidates, rules, bestRule, sourcePath, (DotNodeMultiLabel) dotNode, superNodeCombination);
+           }
+         
+        }                   
+        else if(useSeparateCubePruningStatesForMatchingSubstitutions()){
+          if(exploreAllLabelsForGlueRulesInCubePruningInitialization() && bestRule.isGlueRule(this.config)){               
+            addSeparateGlueRuleCandidatesForEachSubstitutedToLabel(arity, j, candidates, rules, bestRule, sourcePath, (DotNodeMultiLabel) dotNode); 
+          }
+          else{
+            addSeparateCandidatesForMatchingAndNonMatchingSubstitutions(arity, j, candidates, rules, bestRule, sourcePath, dotNode);
+          }
+        }
+        else{
+          addNewCandidate(i,j,candidates, rules, bestRule, sourcePath, dotNode,null);
+        }              
+      }
+      else{
+      
+        //@SuppressWarnings("unchecked")
+        //List<SuperNode> superNodes = (List<SuperNode>) dotNode.getAntSuperNodes();
+        
+        //addNewCandidate(i,j,candidates, rules, bestRule, sourcePath, dotNode, superNodes);
+        addNewCandidate(i,j,candidates, rules, bestRule, sourcePath, dotNode,null);
+    }
+    }
   }
   
   private void printRulesForDebugging(List<Rule> rules){
