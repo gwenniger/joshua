@@ -89,9 +89,18 @@ public class MemoryBasedTrieDistinctLabeledRuleSetsAvailableAtLeafNodes extends
     return distinctLabeledRuleSets;
   }
 
+  /**
+   * Get a label String representation for the rule.
+   * Note that the LHS is not part of the representation. 
+   * The LHS is ignored in the grouping of rules. Why? 
+   * Because this is also done inside the rule Trie to begin with, so it does not 
+   * make sense to start separating rules over LHS here, because this was also not 
+   * done in earlier experiments.
+   * @param rule
+   * @return
+   */
   private String getRuleLabelStringRepresentation(Rule rule) {
     String result = "";
-    result += "LHS: " + Vocabulary.word(rule.getLHS());
     for (Integer nonterminalKey : rule.getForeignNonTerminals()) {
       result += "-nont: " + Vocabulary.word(nonterminalKey);
     }

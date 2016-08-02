@@ -708,6 +708,14 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
         
         /* Use the updated ranks to assign the next rule and tail node. */
         Rule nextRule = rules.get(nextRanks[0] - 1);
+       
+        // This actually may fail with the old implementation that uses labels inside the Trie
+        // The reason is that the LHS is not part of the internal Trie nodes, that is, it is not
+        // used for matching. Hence rules are grouped under the same source RHS,
+        // the LHS label is not part of this grouping.
+       //assureLHSDidNotChange(state, nextRule);
+
+        
         //String nextRanksString = "";
         //for(int index = 0; index < nextRanks.length ; index++){
         //  nextRanksString += "[" + nextRanks[index] + "]" + " ";         
@@ -780,6 +788,26 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
           candidates.add(nextState);
         }   
       }
+    }
+  }
+  
+  /**
+   * Method to test that LHS did not change, used for debugging
+   * @param state
+   * @param nextRule
+   */
+  private void assureLHSDidNotChange(CubePruneStateBase<T> state, Rule nextRule){
+    int oldLHS = state.getRule().getLHS();
+    int newLHS = nextRule.getLHS();
+    if(oldLHS != newLHS){
+      String ruleMessage = "Error: old LHS " + (Vocabulary.word(oldLHS)) + " is not equal to new LHS " + (Vocabulary.word(newLHS)) + " !!!" +
+    "\nrule1: " + state.getRule() + "\nrule2: " + nextRule;
+          
+      throw new RuntimeException(ruleMessage);
+    }
+    else{
+      System.err.println("###Old state lhs: " + (Vocabulary.word(oldLHS)));
+      System.err.println("###New state lhs: " + (Vocabulary.word(newLHS)));
     }
   }
   
