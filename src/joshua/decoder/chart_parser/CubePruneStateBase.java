@@ -20,9 +20,17 @@ public abstract class CubePruneStateBase<T extends joshua.decoder.chart_parser.D
   protected T dotNode;
   //private DotNode dotNode;
   protected final List<ValidAntNodeComputer<T>> validAntNodeComputers;
+  
+  // List that encodes the used indices (labels) of the rule nonterminals on the source
+  // right-hand side of the rule. Can be null to encode there are no fixed labels for the 
+  // source right-hand side nonterminals.
+  // When not null, this list is used to distinguish CubePrune states that are different because they 
+  // have different rule lists, but will look the same for everything but this property and the rule lists.
+  // We avoid comparing the rule lists themselves though, because they can be big, making this too expensive.
+  protected final List<Integer> ruleSourceNonterminalIndices;
 
   public CubePruneStateBase(ComputeNodeResult score, int[] ranks, List<Rule> rules, List<HGNode> antecedents, T dotNode,
-      List<ValidAntNodeComputer<T>> validAntNodeComputers) {
+      List<ValidAntNodeComputer<T>> validAntNodeComputers,List<Integer> ruleSourceNonterminalIndices) {
     this.computeNodeResult = score;
     this.ranks = ranks;
     this.rules = rules;
@@ -30,6 +38,7 @@ public abstract class CubePruneStateBase<T extends joshua.decoder.chart_parser.D
     this.antNodes = new ArrayList<HGNode>(antecedents);
     this.dotNode = dotNode;
     this.validAntNodeComputers = validAntNodeComputers;
+    this.ruleSourceNonterminalIndices = ruleSourceNonterminalIndices;
   }
 
   /**
@@ -92,6 +101,13 @@ public abstract class CubePruneStateBase<T extends joshua.decoder.chart_parser.D
          state.validAntNodeComputers.get(i).labelIndicesNonterminalListsAcceptableIndices())
        return false;
     }
+    
+    
+    // The rule source nonterminal indices serves to distinguish states that look identical, 
+    // but are in fact not because they have different rule lists, without comparing the rule lists themselves
+    if(!this.ruleSourceNonterminalIndices.equals(state.ruleSourceNonterminalIndices)){     
+      return false;
+    }
 
     return true;
   }
@@ -101,6 +117,10 @@ public abstract class CubePruneStateBase<T extends joshua.decoder.chart_parser.D
     int hash = (dotNode != null) ? dotNode.hashCode() : 0;
     hash = hash * prime +  Arrays.hashCode(ranks);
     hash = hash * prime + hashCodeValidAntNodeComputers();
+    
+    if(this.ruleSourceNonterminalIndices != null){
+      hash = hash * prime + this.ruleSourceNonterminalIndices.hashCode();
+    }
     return hash;
   }
   
@@ -146,6 +166,10 @@ public abstract class CubePruneStateBase<T extends joshua.decoder.chart_parser.D
   
   public List<ValidAntNodeComputer<T>> getValidAntNodeComputers(){
     return this.validAntNodeComputers;
+  }
+  
+  public List<Integer> getRuleSourceNonterminalIndices(){
+    return ruleSourceNonterminalIndices;
   }
   
 }

@@ -18,16 +18,16 @@ public class CubePruneStateFuzzyMatching extends CubePruneStateBase<DotNodeMulti
 
   public CubePruneStateFuzzyMatching(ComputeNodeResult score, int[] ranks, List<Rule> rules,
       List<HGNode> antecedents, DotNodeMultiLabel dotNode,
-      List<ValidAntNodeComputer<DotNodeMultiLabel>> validAntNodeComputers) {
-    super(score, ranks, rules, antecedents, dotNode, validAntNodeComputers);
+      List<ValidAntNodeComputer<DotNodeMultiLabel>> validAntNodeComputers,List<Integer> ruleSourceNonterminalIndices) {
+    super(score, ranks, rules, antecedents, dotNode, validAntNodeComputers,ruleSourceNonterminalIndices);
     // assertValidAntNodes();
   }
 
   public static CubePruneStateFuzzyMatching createCubePruneStateFuzzyMatchingImprovedCubePruning(
       ComputeNodeResult score, int[] ranks, List<Rule> rules, List<HGNode> antecedents,
-      DotNodeMultiLabel dotNode, List<ValidAntNodeComputer<DotNodeMultiLabel>> validAntNodeComputers) {
+      DotNodeMultiLabel dotNode, List<ValidAntNodeComputer<DotNodeMultiLabel>> validAntNodeComputers,List<Integer> ruleSourceNonterminalIndices) {
     return new CubePruneStateFuzzyMatching(score, ranks, rules, antecedents, dotNode,
-      validAntNodeComputers);
+      validAntNodeComputers,ruleSourceNonterminalIndices);
   }
   
   public static boolean superNodeMatchesRuleNonterminal(SuperNode superNode,

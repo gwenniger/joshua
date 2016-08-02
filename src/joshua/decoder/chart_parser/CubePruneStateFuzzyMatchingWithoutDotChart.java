@@ -13,13 +13,21 @@ public class CubePruneStateFuzzyMatchingWithoutDotChart extends CubePruneStateBa
 
   public CubePruneStateFuzzyMatchingWithoutDotChart(ComputeNodeResult score, int[] ranks,
       List<Rule> rules, List<HGNode> antecedents, DotNode dotNode,
-      List<ValidAntNodeComputer<DotNode>> validAntNodeComputers) {
-    super(score, ranks, rules, antecedents, dotNode, validAntNodeComputers);
+      List<ValidAntNodeComputer<DotNode>> validAntNodeComputers,List<Integer> ruleSourceNonterminalIndices) {
+    super(score, ranks, rules, antecedents, dotNode, validAntNodeComputers,ruleSourceNonterminalIndices);
   }
   
   public static CubePruneStateFuzzyMatchingWithoutDotChart createCubePruneStateFuzzyMatchingWithoutDotChart(ComputeNodeResult score, int[] ranks, List<Rule> rules,
-      List<HGNode> antecedents, DotNode dotNode, Set<Integer> oovAndGoalNonterminalIndices){
-    return new CubePruneStateFuzzyMatchingWithoutDotChart(score, ranks, rules, antecedents, dotNode, createValidAntNoteComptersFuzzyMatchingWithoutDotChart(dotNode, rules.get(0), oovAndGoalNonterminalIndices));
+      List<HGNode> antecedents, DotNode dotNode, Set<Integer> oovAndGoalNonterminalIndices,List<Integer> ruleSourceNonterminalIndices){
+    
+    if(ruleSourceNonterminalIndices == null){
+      // Not sure if this is OK, for now throw an exception
+      // TODO: Fixme
+      throw new RuntimeException("rule source nonterminal indices is null");
+    }
+    
+    return new CubePruneStateFuzzyMatchingWithoutDotChart(score, ranks, rules, antecedents, dotNode, createValidAntNoteComptersFuzzyMatchingWithoutDotChart(dotNode, rules.get(0), oovAndGoalNonterminalIndices),
+        ruleSourceNonterminalIndices);
   }
 
   public static List<ValidAntNodeComputer<DotNode>> createValidAntNoteComptersFuzzyMatchingWithoutDotChart(
