@@ -22,9 +22,10 @@ public abstract class CubePruneStateBase<T extends joshua.decoder.chart_parser.D
   protected final List<ValidAntNodeComputer<T>> validAntNodeComputers;
   
   // List that encodes the used indices (labels) of the rule nonterminals on the source
-  // right-hand side of the rule. Can be null to encode there are no fixed labels for the 
-  // source right-hand side nonterminals.
-  // When not null, this list is used to distinguish CubePrune states that are different because they 
+  // right-hand side of the rule. Can be empty if there are no RHS nonterminals, when there are  
+  // no fixed labels, or when the DotNodes themselves are enough to distinguish states - which is 
+  // the case when labels are retained inside grammar Trie nodes.
+  // When not empty, this list is used to distinguish CubePrune states that are different because they 
   // have different rule lists, but will look the same for everything but this property and the rule lists.
   // We avoid comparing the rule lists themselves though, because they can be big, making this too expensive.
   protected final List<Integer> ruleSourceNonterminalIndices;
@@ -117,10 +118,9 @@ public abstract class CubePruneStateBase<T extends joshua.decoder.chart_parser.D
     int hash = (dotNode != null) ? dotNode.hashCode() : 0;
     hash = hash * prime +  Arrays.hashCode(ranks);
     hash = hash * prime + hashCodeValidAntNodeComputers();
+    // ruleSourceNonterminalIndices must be not null, but it can be an empty list when it is not used    
+    hash = hash * prime + this.ruleSourceNonterminalIndices.hashCode();
     
-    if(this.ruleSourceNonterminalIndices != null){
-      hash = hash * prime + this.ruleSourceNonterminalIndices.hashCode();
-    }
     return hash;
   }
   

@@ -255,7 +255,8 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
         }          
         else{
           RuleCollection ruleCollection = dotNode.getRuleCollection();
-          createInitialCubePruningStatesForRuleCollection(candidates, ruleCollection, dotNode, i, j,null);
+          List<Integer> ruleSourceNonterminalIndices =  Collections.emptyList();
+          createInitialCubePruningStatesForRuleCollection(candidates, ruleCollection, dotNode, i, j,ruleSourceNonterminalIndices);
         }
         
         
@@ -644,8 +645,9 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
         currentTailNodes, i, j, sourcePath, sentence);
     CubePruneStateBase<T> bestState = null; 
 
-    bestState = (CubePruneStateBase<T>) 
-    CubePruneStateFuzzyMatching.createCubePruneStateFuzzyMatchingImprovedCubePruning(result, ranks, rules, currentTailNodes, dotNode, validAntNodeComputers,null);
+    List<Integer> ruleSourceNonterminalIndices =  Collections.emptyList();
+    bestState = (CubePruneStateBase<T>)       
+    CubePruneStateFuzzyMatching.createCubePruneStateFuzzyMatchingImprovedCubePruning(result, ranks, rules, currentTailNodes, dotNode, validAntNodeComputers,ruleSourceNonterminalIndices);
                           
     candidates.add(bestState);
   }
