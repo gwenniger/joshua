@@ -237,26 +237,15 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
             //System.err.println(">>> Found " + distinctLabelingRuleCollectionsList.size() + " different rule labelings for the rule");
             
             
-            //int labelingIndex = 0;
-            for(RuleCollection ruleCollection : distinctLabelingRuleCollectionsList){
-            
-              Rule firstRule = ruleCollection.getRules().get(0);
-              List<Integer> ruleSourceNonterminalIndices = new ArrayList<Integer>();
-              for(Integer rhsNonterminalIndex : firstRule.getForeignNonTerminals()){
-                ruleSourceNonterminalIndices.add(rhsNonterminalIndex);
-              }
-              //System.err.println(">>> labeling " + labelingIndex + "  ruleSourceNonterminalIndices :" +  ruleSourceNonterminalIndices );
-              
-              createInitialCubePruningStatesForRuleCollection(candidates, ruleCollection, dotNode, i, j,ruleSourceNonterminalIndices);
-              //labelingIndex++;
+            for(RuleCollection ruleCollection : distinctLabelingRuleCollectionsList){              
+              createInitialCubePruningStatesForRuleCollection(candidates, ruleCollection, dotNode, i, j);
             }
           }
           //System.err.println("<<< Exploration finished");
         }          
         else{
           RuleCollection ruleCollection = dotNode.getRuleCollection();
-          List<Integer> ruleSourceNonterminalIndices =  Collections.emptyList();
-          createInitialCubePruningStatesForRuleCollection(candidates, ruleCollection, dotNode, i, j,ruleSourceNonterminalIndices);
+          createInitialCubePruningStatesForRuleCollection(candidates, ruleCollection, dotNode, i, j);
         }
         
         
@@ -273,7 +262,7 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
   }
   
   public void createInitialCubePruningStatesForRuleCollection( PriorityQueue<CubePruneStateBase<T>> candidates,
-      RuleCollection ruleCollection,T dotNode, int i, int j,List<Integer> ruleSourceNonterminalIndices){
+      RuleCollection ruleCollection,T dotNode, int i, int j){
     if (ruleCollection == null)
       return;
 
@@ -382,11 +371,11 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
             addSeparateGlueRuleCandidatesForEachSubstitutedToLabel(arity, j, candidates, rules, bestRule, sourcePath, (DotNodeMultiLabel) dotNode); 
           }
           else{
-            addSeparateCandidatesForMatchingAndNonMatchingSubstitutions(arity, j, candidates, rules, bestRule, sourcePath, dotNode,ruleSourceNonterminalIndices);
+            addSeparateCandidatesForMatchingAndNonMatchingSubstitutions(arity, j, candidates, rules, bestRule, sourcePath, dotNode);
           }
         }
         else{
-          addNewCandidate(i,j,candidates, rules, bestRule, sourcePath, dotNode,null,ruleSourceNonterminalIndices);
+          addNewCandidate(i,j,candidates, rules, bestRule, sourcePath, dotNode,null);
         }              
       }
       else{
@@ -395,7 +384,7 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
         //List<SuperNode> superNodes = (List<SuperNode>) dotNode.getAntSuperNodes();
         
         //addNewCandidate(i,j,candidates, rules, bestRule, sourcePath, dotNode, superNodes);
-        addNewCandidate(i,j,candidates, rules, bestRule, sourcePath, dotNode,null,ruleSourceNonterminalIndices);
+        addNewCandidate(i,j,candidates, rules, bestRule, sourcePath, dotNode,null);
     }
     }
   }
@@ -477,11 +466,11 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
    * @param dotNode
    */
   private void addSeparateCandidatesForMatchingAndNonMatchingSubstitutions(int i, int j, PriorityQueue<CubePruneStateBase<T>> candidates,     
-      List<Rule> rules,Rule bestRule,SourcePath sourcePath,T dotNode,List<Integer> ruleSourceNonterminalIndices){
+      List<Rule> rules,Rule bestRule,SourcePath sourcePath,T dotNode){
     //System.err.println(">>> addSeparateCandidatesForMatchingAndNonMatchingSubstitutions...");
     for(List<Boolean> fixedRuleMatchingNonterminalsFlagsAlternative : CubePruneStateFuzzyMatching.createCubePruningStateCreationFixedRuleMatchingNonterminalsFlagsAlternatives((DotNodeMultiLabel) dotNode, bestRule)){
       //Assert.assertTrue(fixedRuleMatchingNonterminalsFlagsAlternative.size() > 0);
-      addNewCandidate(i,j,candidates, rules, bestRule, sourcePath, dotNode,fixedRuleMatchingNonterminalsFlagsAlternative,ruleSourceNonterminalIndices);
+      addNewCandidate(i,j,candidates, rules, bestRule, sourcePath, dotNode,fixedRuleMatchingNonterminalsFlagsAlternative);
     }
   }
   
@@ -573,8 +562,7 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
   
   @SuppressWarnings("unchecked")
   private void addNewCandidate(int i, int j, PriorityQueue<CubePruneStateBase<T>> candidates,
-      List<Rule> rules,Rule bestRule,SourcePath sourcePath,T dotNode, List<Boolean> useFixedRuleMatchingNonterminalsFlags,
-      List<Integer> ruleSourceNonterminalIndices){
+      List<Rule> rules,Rule bestRule,SourcePath sourcePath,T dotNode, List<Boolean> useFixedRuleMatchingNonterminalsFlags){
   
     //System.err.println("Gideon: addNewCandidate");    
     
@@ -606,7 +594,7 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
         
     if(peformFuzzyMatching()){   
        bestState = (CubePruneStateBase<T>) 
-       CubePruneStateFuzzyMatching.createCubePruneStateFuzzyMatchingImprovedCubePruning(result, ranks, rules, currentTailNodes, (DotNodeMultiLabel) dotNode, validAntNodeComputers,ruleSourceNonterminalIndices);
+       CubePruneStateFuzzyMatching.createCubePruneStateFuzzyMatchingImprovedCubePruning(result, ranks, rules, currentTailNodes, (DotNodeMultiLabel) dotNode, validAntNodeComputers);
     }
     
     else{
@@ -645,9 +633,8 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
         currentTailNodes, i, j, sourcePath, sentence);
     CubePruneStateBase<T> bestState = null; 
 
-    List<Integer> ruleSourceNonterminalIndices =  Collections.emptyList();
     bestState = (CubePruneStateBase<T>)       
-    CubePruneStateFuzzyMatching.createCubePruneStateFuzzyMatchingImprovedCubePruning(result, ranks, rules, currentTailNodes, dotNode, validAntNodeComputers,ruleSourceNonterminalIndices);
+    CubePruneStateFuzzyMatching.createCubePruneStateFuzzyMatchingImprovedCubePruning(result, ranks, rules, currentTailNodes, dotNode, validAntNodeComputers);
                           
     candidates.add(bestState);
   }
@@ -760,7 +747,7 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
             
             // When first creating the state, we do not compute the node result yet, but instantiate it to null
             nextState = (CubePruneStateBase<T>) new CubePruneStateFuzzyMatching(null, nextRanks, rules,
-                nextAntNodes, (DotNodeMultiLabel)dotNode,validAntNodeComputersCasted,state.getRuleSourceNonterminalIndices());
+                nextAntNodes, (DotNodeMultiLabel)dotNode,validAntNodeComputersCasted);
           }
           else{
             List<ValidAntNodeComputer<DotNode>> validAntNodeComputersCasted = new ArrayList<ValidAntNodeComputer<DotNode>> ();
@@ -769,7 +756,7 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
             }       
             
             // When first creating the state, we do not compute the node result yet, but instantiate it to null
-            nextState = (CubePruneStateBase<T>) new CubePruneStateFuzzyMatchingWithoutDotChart(null, nextRanks, rules, nextAntNodes,(DotNode) dotNode, validAntNodeComputersCasted,state.getRuleSourceNonterminalIndices());
+            nextState = (CubePruneStateBase<T>) new CubePruneStateFuzzyMatchingWithoutDotChart(null, nextRanks, rules, nextAntNodes,(DotNode) dotNode, validAntNodeComputersCasted);
           }
         }
         else{

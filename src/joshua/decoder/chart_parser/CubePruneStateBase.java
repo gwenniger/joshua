@@ -21,17 +21,9 @@ public abstract class CubePruneStateBase<T extends joshua.decoder.chart_parser.D
   //private DotNode dotNode;
   protected final List<ValidAntNodeComputer<T>> validAntNodeComputers;
   
-  // List that encodes the used indices (labels) of the rule nonterminals on the source
-  // right-hand side of the rule. Can be empty if there are no RHS nonterminals, when there are  
-  // no fixed labels, or when the DotNodes themselves are enough to distinguish states - which is 
-  // the case when labels are retained inside grammar Trie nodes.
-  // When not empty, this list is used to distinguish CubePrune states that are different because they 
-  // have different rule lists, but will look the same for everything but this property and the rule lists.
-  // We avoid comparing the rule lists themselves though, because they can be big, making this too expensive.
-  protected final List<Integer> ruleSourceNonterminalIndices;
 
   public CubePruneStateBase(ComputeNodeResult score, int[] ranks, List<Rule> rules, List<HGNode> antecedents, T dotNode,
-      List<ValidAntNodeComputer<T>> validAntNodeComputers,List<Integer> ruleSourceNonterminalIndices) {
+      List<ValidAntNodeComputer<T>> validAntNodeComputers) {
     this.computeNodeResult = score;
     this.ranks = ranks;
     this.rules = rules;
@@ -39,7 +31,6 @@ public abstract class CubePruneStateBase<T extends joshua.decoder.chart_parser.D
     this.antNodes = new ArrayList<HGNode>(antecedents);
     this.dotNode = dotNode;
     this.validAntNodeComputers = validAntNodeComputers;
-    this.ruleSourceNonterminalIndices = ruleSourceNonterminalIndices;
   }
 
   /**
@@ -103,10 +94,12 @@ public abstract class CubePruneStateBase<T extends joshua.decoder.chart_parser.D
        return false;
     }
     
-    
-    // The rule source nonterminal indices serves to distinguish states that look identical, 
-    // but are in fact not because they have different rule lists, without comparing the rule lists themselves
-    if(!this.ruleSourceNonterminalIndices.equals(state.ruleSourceNonterminalIndices)){     
+    // We need to check that the source sides correspond (in particular the nonterminals, but it does not 
+    // hurt to compare everything, as getting only the nonterminals is more expensive)
+    // When fuzzy matching is used with no labels inside the Trie, but with exploration of all distinct 
+    // rule labelings, we can have two states that are identical for everything including rank, but different 
+    // for their rules (and rule lists). Checking the French side is a relatively cheap way to catch this. 
+    if(!this.getRule().getFrench().equals(state.getRule().getFrench())){     
       return false;
     }
 
@@ -119,7 +112,7 @@ public abstract class CubePruneStateBase<T extends joshua.decoder.chart_parser.D
     hash = hash * prime +  Arrays.hashCode(ranks);
     hash = hash * prime + hashCodeValidAntNodeComputers();
     // ruleSourceNonterminalIndices must be not null, but it can be an empty list when it is not used    
-    hash = hash * prime + this.ruleSourceNonterminalIndices.hashCode();
+    hash = hash * prime + Arrays.hashCode(this.getRule().getFrench());
     
     return hash;
   }
@@ -166,10 +159,6 @@ public abstract class CubePruneStateBase<T extends joshua.decoder.chart_parser.D
   
   public List<ValidAntNodeComputer<T>> getValidAntNodeComputers(){
     return this.validAntNodeComputers;
-  }
-  
-  public List<Integer> getRuleSourceNonterminalIndices(){
-    return ruleSourceNonterminalIndices;
   }
   
 }

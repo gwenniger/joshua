@@ -10,7 +10,7 @@ public class CubePruneState extends CubePruneStateBase<DotNode>{
 
   public CubePruneState(ComputeNodeResult score, int[] ranks, List<Rule> rules,
       List<HGNode> antecedents, DotNode dotNode,List<ValidAntNodeComputer<DotNode>> validAntNodeComputers) {
-    super(score, ranks, rules, antecedents, dotNode,validAntNodeComputers,null);
+    super(score, ranks, rules, antecedents, dotNode,validAntNodeComputers);
   }
 
   public static CubePruneState createCubePruneState(ComputeNodeResult score, int[] ranks, List<Rule> rules,
