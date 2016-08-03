@@ -62,6 +62,7 @@ public class MemoryBasedTrieDistinctLabeledRuleSetsAvailableAtLeafNodes extends
     return rulesMap;
 
   }
+  
 
   private List<RuleCollection> computeDistinctLabeledRuleSetsSorted(List<FeatureFunction> models) {
     List<RuleCollection> result = new ArrayList<RuleCollection>();
@@ -69,7 +70,7 @@ public class MemoryBasedTrieDistinctLabeledRuleSetsAvailableAtLeafNodes extends
     Map<String, List<Rule>> rulesMap = computeRuleLabelingToRuleListMap(models);
     for (List<Rule> sortedRulesList : rulesMap.values()) {
       MemoryBasedRuleBin memmoryBasedRuleBin = new MemoryBasedRuleBin(this.getRuleCollection()
-          .getArity(), this.getRuleCollection().getSourceSide());
+          .getArity(), this.getRuleCollection().getSourceSide(),false);
       for (Rule rule : sortedRulesList) {
         memmoryBasedRuleBin.addRule(rule);
       }

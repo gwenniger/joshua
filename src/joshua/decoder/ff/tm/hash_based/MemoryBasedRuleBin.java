@@ -10,14 +10,17 @@ import joshua.decoder.ff.tm.Rule;
  */
 public class MemoryBasedRuleBin extends BasicRuleCollection {
 
+  private final boolean allRulesShareSameSourceSide;
+  
   /**
    * Constructs an initially empty rule collection.
    * 
    * @param arity Number of nonterminals in the source pattern
    * @param sourceTokens Sequence of terminals and nonterminals in the source pattern
    */
-  public MemoryBasedRuleBin(int arity, int[] sourceTokens) {
+  public MemoryBasedRuleBin(int arity, int[] sourceTokens,boolean allRulesShareSameSourceSide) {
     super(arity, sourceTokens);
+    this.allRulesShareSameSourceSide = allRulesShareSameSourceSide;
   }
 
   /**
@@ -36,6 +39,13 @@ public class MemoryBasedRuleBin extends BasicRuleCollection {
     }
     rules.add(rule);
     sorted = false;
-    rule.setFrench(this.sourceTokens);
+    
+    // As an optimization to save memory, we can replace the
+    // rules source side with the rule bin source side, provided
+    // the source sides are actually shared (i.e. this is not always the 
+    // case when this class is used for fuzzy matching grammar Tries)
+    if(allRulesShareSameSourceSide){
+      rule.setFrench(this.sourceTokens);
+    }  
   }
 }

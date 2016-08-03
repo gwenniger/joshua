@@ -53,6 +53,8 @@ public class MemoryBasedBatchGrammar extends AbstractGrammar {
 
   /* Whether the grammar's rules contain regular expressions. */
   private boolean isRegexpGrammar = false;
+  
+
 
   // ===============================================================
   // Static Fields
@@ -107,6 +109,15 @@ public class MemoryBasedBatchGrammar extends AbstractGrammar {
     this.printGrammar();
   }
 
+  /**
+   * Whether the rues in the rule bins of the Trie are guaranteed to share the same source side.
+   * If we the labels are removed inside the Trie for more efficient fuzzy matching, this is not the case.
+   * @return
+   */
+  protected boolean rulesInTrieRuleBinsShareSameSourceSideLabels(){
+    return !joshuaConfiguration.remove_labels_inside_grammar_trie_for_more_efficient_fuzzy_matching;
+  }
+  
   protected GrammarReader<Rule> createReader(String format, String grammarFile) {
 
     if (grammarFile != null) {
@@ -243,10 +254,15 @@ public class MemoryBasedBatchGrammar extends AbstractGrammar {
 
     // === add the rule into the trie node
     if (!pos.hasRules()) {
-      pos.ruleBin = new MemoryBasedRuleBin(ruleForIndexingInTrie.getArity(), ruleForIndexingInTrie.getFrench());
+      pos.ruleBin = new MemoryBasedRuleBin(ruleForIndexingInTrie.getArity(), ruleForIndexingInTrie.getFrench(),
+          rulesInTrieRuleBinsShareSameSourceSideLabels());
       this.qtyRuleBins++;
     }
     // We add the actual rule to the rule bin
+    
+    //System.err.println("##Rule for indexing: " + ruleForIndexingInTrie);
+    //System.err.println("##Actual rule: " + rule);
+    
     pos.ruleBin.addRule(rule);
   }
 

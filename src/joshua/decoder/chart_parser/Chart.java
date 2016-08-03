@@ -237,7 +237,7 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
             //System.err.println(">>> Found " + distinctLabelingRuleCollectionsList.size() + " different rule labelings for the rule");
             
             
-            
+            //int labelingIndex = 0;
             for(RuleCollection ruleCollection : distinctLabelingRuleCollectionsList){
             
               Rule firstRule = ruleCollection.getRules().get(0);
@@ -245,8 +245,10 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
               for(Integer rhsNonterminalIndex : firstRule.getForeignNonTerminals()){
                 ruleSourceNonterminalIndices.add(rhsNonterminalIndex);
               }
+              //System.err.println(">>> labeling " + labelingIndex + "  ruleSourceNonterminalIndices :" +  ruleSourceNonterminalIndices );
               
               createInitialCubePruningStatesForRuleCollection(candidates, ruleCollection, dotNode, i, j,ruleSourceNonterminalIndices);
+              //labelingIndex++;
             }
           }
           //System.err.println("<<< Exploration finished");
