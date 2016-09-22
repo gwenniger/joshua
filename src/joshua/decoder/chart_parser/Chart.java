@@ -40,6 +40,7 @@ import joshua.lattice.Arc;
 import joshua.lattice.Lattice;
 import joshua.lattice.Node;
 import joshua.util.ChartSpan;
+import joshua.util.Pair;
 
 /**
  * Chart class this class implements chart-parsing: (1) seeding the chart (2)
@@ -213,6 +214,25 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
     /* STEP 1: create the heap, and seed it with all of the candidate states */
     PriorityQueue<CubePruneStateBase<T>> candidates = new PriorityQueue<CubePruneStateBase<T>>();
 
+    int numProcessedRuleCollections = 0;
+    
+    
+    // Create a list of pairs of rule collections and T items (dotnodes).
+    // The goal of doing this, is that we can shuffle this list, before adding its elements to the 
+    // priority queue. This is to avoid all different labeled versions of the same rule to be added 
+    // together in sequence, which may be sub-optimal for search, if the scores of the evaluated items 
+    // are insufficient to distinguish them. Shuffling promotes more diversity in the top of the 
+    // queue, in case the scores are not informative yet in distinguishing the queue items.
+    // This thus achieves a similar effect to working with the dotchart, and keeping different 
+    // labeled versions of the same Hiero rule type in it, so that these produce 
+    // distinct dotnodes. The latter, while not explicitly shuffling the order, assures at least 
+    // that not all alternatively labeled versions of the same Hiero rule type are added consecutively.
+    // Not shuffling but exploring all distinct rule versions per Hiero rule type 
+    // might cause suboptimal results, because of the homogeneousness of the order in which 
+    // the rule versions are added (this requires more empirical investigation).
+    List<Pair<RuleCollection,T>> allRuleCollections = new ArrayList<Pair<RuleCollection,T>>();
+    
+     
     /*
      * Look at all the grammars, seeding the chart with completed rules from the
      * DotChart
@@ -236,22 +256,41 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
             
             //System.err.println(">>> Found " + distinctLabelingRuleCollectionsList.size() + " different rule labelings for the rule");
             
+            for(RuleCollection ruleCollection : distinctLabelingRuleCollectionsList){
+              allRuleCollections.add(new Pair<RuleCollection,T>(ruleCollection,dotNode));  
+            }
             
+            /*
             for(RuleCollection ruleCollection : distinctLabelingRuleCollectionsList){              
               createInitialCubePruningStatesForRuleCollection(candidates, ruleCollection, dotNode, i, j);
-            }
+              if(ruleCollection!= null){
+                numProcessedRuleCollections++;
+              }
+            }*/
           }
           //System.err.println("<<< Exploration finished");
         }          
         else{
           RuleCollection ruleCollection = dotNode.getRuleCollection();
-          createInitialCubePruningStatesForRuleCollection(candidates, ruleCollection, dotNode, i, j);
-        }
-        
-        
+          if(ruleCollection!= null){
+            numProcessedRuleCollections++;
+          }
+         // createInitialCubePruningStatesForRuleCollection(candidates, ruleCollection, dotNode, i, j);
+          allRuleCollections.add(new Pair<RuleCollection,T>(ruleCollection,dotNode));         
+        }                
       }
 
     }
+    
+    // Shuffle the list off RuleCollection-DotNode pairs. The goal of this, is to promote diversity in the order 
+    // in which the RuleCollections are processed. 
+    Collections.shuffle(allRuleCollections);
+    for(Pair<RuleCollection,T> ruleCollectionDotNodePair : allRuleCollections){              
+      createInitialCubePruningStatesForRuleCollection(candidates, ruleCollectionDotNodePair.getFirst(), ruleCollectionDotNodePair.getSecond(), i, j);    
+    }
+    
+    
+    //System.err.println("Span: " + i +"," + j + " number processed rule collections: " + numProcessedRuleCollections);
 
     applyCubePruning(i, j, candidates);
   }
@@ -263,8 +302,9 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
   
   public void createInitialCubePruningStatesForRuleCollection( PriorityQueue<CubePruneStateBase<T>> candidates,
       RuleCollection ruleCollection,T dotNode, int i, int j){
-    if (ruleCollection == null)
+    if (ruleCollection == null){
       return;
+    }  
 
     List<Rule> rules = ruleCollection.getSortedRules(this.featureFunctions);
     
@@ -275,8 +315,10 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
     
     SourcePath sourcePath = dotNode.getSourcePath();
 
-    if (null == rules || rules.size() == 0)
+    if (null == rules || rules.size() == 0){
+      //System.err.println("Gideon: empty rule set");
       return;
+    }  
 
     int arity = ruleCollection.getArity();
     
@@ -298,6 +340,8 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
           break;
         }
 
+        //System.err.println("Gideon: Rule words: " + rule.getFrenchWords() + " lhs: " + Vocabulary.word(rule.getLHS()));
+        
         ComputeNodeResult result = new ComputeNodeResult(this.featureFunctions, rule, null, i,
             j, sourcePath, this.sentence);
 
@@ -311,6 +355,7 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
 
       Rule bestRule = rules.get(0);
 
+      //System.err.println("Gideon: Rule words: " + bestRule.getFrenchWords() + " lhs: " + Vocabulary.word(bestRule.getLHS()));
 
       if(peformFuzzyMatching()){                        
         if(!(dotNode instanceof DotNodeMultiLabel)){
