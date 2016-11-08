@@ -294,6 +294,11 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
 
     applyCubePruning(i, j, candidates);
   }
+ 
+  
+
+  
+  
   
   private boolean useFuzzyMatchingDecodingWithLabelsRemovedInsideTrieButAllDistinctRuleLabelingsExploredInCubePruningInitialization(){
     return config.fuzzy_matching && config.remove_labels_inside_grammar_trie_for_more_efficient_fuzzy_matching &&
