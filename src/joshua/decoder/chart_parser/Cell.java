@@ -173,7 +173,7 @@ class Cell {
 
       /**
        * the position of oldItem in this.heapItems may change, basically, we should remove the
-       * oldItem, and re-insert it (linear time), this is too expense)
+       * oldItem, and re-insert it (linear time), this is too expensive)
        **/
       if (newNode.getScore() > oldNode.getScore()) { // merge old to new: semiring plus
 
@@ -193,6 +193,25 @@ class Cell {
     return newNode;
   }
 
+  HGNode addHyperEdgeInCellRestrictingMaxNumberLabelingsPerLanguageModelState(ComputeNodeResult result, Rule rule, int i, int j, List<HGNode> ants,
+      SourcePath srcPath, boolean noPrune,RestrictLabeledVersionsLanguageModelStatePruning restrictLabeledVersionsLanguageModelStatePruning) {
+    // System.err.println(">>>addHyperEdgeInCellRestrictingMaxNumberLabelingsPerLanguageModelState...");
+     
+     if(ants == null){
+       throw new RuntimeException("Gideon: >>> Error: ants is null!!!");
+     }
+     
+     HGNode resultHGNode =  addHyperEdgeInCell(result, rule, i, j, ants, srcPath, noPrune);
+     HGNode toBeRemovedNode = restrictLabeledVersionsLanguageModelStatePruning.addHGNodeAndReturnRemovedNodeIfAny(resultHGNode);
+     if(toBeRemovedNode != null){
+       removeNode(toBeRemovedNode);
+     }
+     return resultHGNode;
+  }
+
+  
+  
+  
   List<HGNode> getSortedNodes() {
     ensureSorted();
     return this.sortedNodes;
@@ -227,6 +246,20 @@ class Cell {
       this.superNodesTbl.put(node.lhs, si);
     }
     si.nodes.add(node);// TODO what about the dead items?
+  }
+  
+  
+  /** 
+   * This method removes a node. To be used when restricting the number of labeled versions 
+   * per Language Model state.
+   * @param node
+   */
+  private void removeNode(HGNode node) {
+    System.err.println("Removing node: " + node);
+    SuperNode si = this.superNodesTbl.get(node.lhs);   
+    si.nodes.remove(node);
+    this.nodesSigTbl.remove(node.signature());
+    this.sortedNodes = null; // reset the list
   }
 
   /**

@@ -209,7 +209,7 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
    * arity of a rule is R, then the dimension of the hypercube is R + 1, since
    * the first dimension is used to record the rule.
    */
-  private void completeSpan(int i, int j) {
+  private void completeSpan(int i, int j,RestrictLabeledVersionsLanguageModelStatePruning restrictLabeledVersionsLanguageModelStatePruning) {
 
     /* STEP 1: create the heap, and seed it with all of the candidate states */
     PriorityQueue<CubePruneStateBase<T>> candidates = new PriorityQueue<CubePruneStateBase<T>>();
@@ -292,7 +292,7 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
     
     //System.err.println("Span: " + i +"," + j + " number processed rule collections: " + numProcessedRuleCollections);
 
-    applyCubePruning(i, j, candidates);
+    applyCubePruning(i, j, candidates,restrictLabeledVersionsLanguageModelStatePruning);
   }
  
   
@@ -304,6 +304,17 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
     return config.fuzzy_matching && config.remove_labels_inside_grammar_trie_for_more_efficient_fuzzy_matching &&
     config.explore_all_distinct_labled_rule_versions_in_cube_pruning_initialization;
   }
+  
+  /**
+   * Method that determines whether the maximum number of labelings per language model state should 
+   * be limited, in order to limit complexity and memory consumption, as well as hopefully increase 
+   * performance for grammars with large label sets. 
+   * @return
+   */
+  private boolean restrictNumberOfLabelingsPerLanguageModelState(){
+    return true;
+  }
+  
   
   public void createInitialCubePruningStatesForRuleCollection( PriorityQueue<CubePruneStateBase<T>> candidates,
       RuleCollection ruleCollection,T dotNode, int i, int j){
@@ -699,7 +710,8 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
    * @param candidates
    */
   @SuppressWarnings("unchecked")
-  private void applyCubePruning(int i, int j, PriorityQueue<CubePruneStateBase<T>> candidates) {
+  private void applyCubePruning(int i, int j, PriorityQueue<CubePruneStateBase<T>> candidates,
+      RestrictLabeledVersionsLanguageModelStatePruning restrictLabeledVersionsLanguageModelStatePruning) {
 
     // System.err.println(String.format("CUBEPRUNE: %d-%d with %d candidates",
     // i, j, candidates.size()));
@@ -728,8 +740,11 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
        * doing constrained decoding or (b) we are and the state is legal.
        */
       if (stateConstraint == null || stateConstraint.isLegal(state.getDPStates())) {
-        getCell(i, j).addHyperEdgeInCell(state.computeNodeResult, state.getRule(), i, j,
-            state.antNodes, sourcePath, true);
+        
+        //getCell(i, j).addHyperEdgeInCell(state.computeNodeResult, state.getRule(), i, j,
+        //    state.antNodes, sourcePath, true);
+        Cell chartBin = getCell(i, j);
+        addHyperEdgeInCell(chartBin, state.computeNodeResult, state.getRule(), i, j, state.antNodes, restrictLabeledVersionsLanguageModelStatePruning);
       }
 
       /*
@@ -980,10 +995,10 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
         }
 
         // Now that we've accumulated all the candidates, apply cube pruning
-        applyCubePruning(i, j, (allCandidates[j - i]));
+        applyCubePruning(i, j, (allCandidates[j - i]),null);
 
         // Add unary nodes
-        addUnaryNodes(this.grammars, i, j);
+        addUnaryNodes(this.grammars, i, j,null);
       }
     }
 
@@ -1211,16 +1226,20 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
           this.dotcharts[k].expandDotCell(i, j);
         }
 
+        
+        RestrictLabeledVersionsLanguageModelStatePruning restrictLabeledVersionsLanguageModelStatePruning =  
+            RestrictLabeledVersionsLanguageModelStatePruning.createRestrictLabeledVersionsLanguageModelStatePruning(); 
+                
         /*
          * 2. The regular CKY part: add completed items onto the chart via cube
          * pruning.
          */
         logger.finest("Adding complete items into chart");
-        completeSpan(i, j);
+        completeSpan(i, j,restrictLabeledVersionsLanguageModelStatePruning);
 
         /* 3. Process unary rules. */
         logger.finest("Adding unary items into chart");
-        addUnaryNodes(this.grammars, i, j);
+        addUnaryNodes(this.grammars, i, j,restrictLabeledVersionsLanguageModelStatePruning);
 
         // (4)=== in dot_cell(i,j), add dot-nodes that start from the /complete/
         // superIterms in
@@ -1296,7 +1315,7 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
    * @param j
    * @return the number of nodes added
    */
-  private int addUnaryNodes(Grammar[] grammars, int i, int j) {
+  private int addUnaryNodes(Grammar[] grammars, int i, int j,RestrictLabeledVersionsLanguageModelStatePruning restrictLabeledVersionsLanguageModelStatePruning) {
 
     Cell chartBin = this.cells.get(i, j);
     if (null == chartBin) {
@@ -1333,8 +1352,12 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
 
             ComputeNodeResult states = new ComputeNodeResult(this.featureFunctions, rule,
                 antecedents, i, j, new SourcePath(), this.sentence);
-            HGNode resNode = chartBin.addHyperEdgeInCell(states, rule, i, j, antecedents,
-                new SourcePath(), true);
+            
+            HGNode resNode = addHyperEdgeInCell(chartBin, states, rule, i, j, antecedents, 
+                restrictLabeledVersionsLanguageModelStatePruning);
+            //HGNode resNode = getCell(i, j).addHyperEdgeInCell(states, rule, i, j,
+            //    antecedents, new SourcePath(), true);          
+            
 
             if (logger.isLoggable(Level.FINEST))
               logger.finest(rule.toString());
@@ -1350,6 +1373,34 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
     return qtyAdditionsToQueue;
   }
 
+  /**
+   * Adds the hyperEdge to the cell, with slightly different behavior 
+   * of keeping only a limited number of best labelings per language model state if 
+   * restrictNumberOfLabelingsPerLanguageModelState is turned on in the configuration.
+   * 
+   * @param chartBin
+   * @param states
+   * @param rule
+   * @param i
+   * @param j
+   * @param antecedents
+   * @param restrictLabeledVersionsLanguageModelStatePruning
+   * @return
+   */
+  private HGNode addHyperEdgeInCell(Cell chartBin,ComputeNodeResult states,Rule rule, int i, int j,
+      List<HGNode> antecedents,RestrictLabeledVersionsLanguageModelStatePruning restrictLabeledVersionsLanguageModelStatePruning ){
+    if(restrictNumberOfLabelingsPerLanguageModelState()){     
+      return chartBin.addHyperEdgeInCellRestrictingMaxNumberLabelingsPerLanguageModelState(states, rule, i, j, antecedents,
+          new SourcePath(), true, restrictLabeledVersionsLanguageModelStatePruning);      
+    }
+    else{
+      return  chartBin.addHyperEdgeInCell(states, rule, i, j, antecedents,
+          new SourcePath(), true);  
+    }
+
+  }
+  
+  
   /***
    * Add a terminal production (X -> english phrase) to the hypergraph.
    * 

@@ -11,7 +11,7 @@ import joshua.decoder.hypergraph.HGNode;
  */
 public class RestrictedSizeBestHGNodeSet {
 
-  private static final int MAX_NUM_LABELED_VERSIONS_PER_LM_STATE = 100;
+  private static final int MAX_NUM_LABELED_VERSIONS_PER_LM_STATE = 50;
   private final TreeSet<HGNode> hgNodes;
 
   private RestrictedSizeBestHGNodeSet(TreeSet<HGNode> hgNodes) {
@@ -35,10 +35,18 @@ public class RestrictedSizeBestHGNodeSet {
     if (hgNodes.size() < MAX_NUM_LABELED_VERSIONS_PER_LM_STATE) {
       hgNodes.add(hgNode);
     } else {
+      System.err.println(">>>Exceeded max num labeled versions per LM state: " + MAX_NUM_LABELED_VERSIONS_PER_LM_STATE);
       HGNode first = hgNodes.first();
-      if (first.compareTo(hgNode) < 0) {
+      System.err.println(">>> First node: " + first);
+      System.err.println(">>> Second node: " + hgNode);
+      if (HGNode.logPComparator.compare(first,hgNode) < 0) {
+        System.err.println(">>> removing first node...");
         removedNode = hgNodes.pollFirst();
         hgNodes.add(hgNode);
+      }else{
+        System.err.println(">>> removing second node (added node itself)...");
+        // the added node itself is not within the top MAX_NUM_LABELED_VERSIONS_PER_LM_STATE, so must be removed again
+        removedNode = hgNode;
       }
     }
     return removedNode;

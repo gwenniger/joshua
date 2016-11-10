@@ -35,7 +35,7 @@ public class NextAntNodesPreparer<T extends DotNodeBase<?>> {
         nextAntNodes.add(nextAntNode);
         //System.err.println(">>Gideon: foundNextValidAntNode");
       } else {
-        //System.err.println(">>Gideon: failed foundNextValidAntNode");
+        System.err.println(">>Gideon: failed foundNextValidAntNode");
         return null;
       }
     }
