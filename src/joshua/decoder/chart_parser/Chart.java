@@ -1251,6 +1251,8 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
           }
         }
 
+        restrictLabeledVersionsLanguageModelStatePruning.showNodeAdditionReport();
+        
         /*
          * 5. Sort the nodes in the cell.
          * 

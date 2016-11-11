@@ -2,21 +2,30 @@ package joshua.decoder.chart_parser;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
+
+import joshua.decoder.chart_parser.RestrictedSizeBestHGNodeSet.NodeAdditionReport;
 import joshua.decoder.ff.state_maintenance.DPState;
 import joshua.decoder.hypergraph.HGNode;
 
 public class RestrictLabeledVersionsLanguageModelStatePruning {
 
   private final Map<SignatureIgnoringLHS, RestrictedSizeBestHGNodeSet> signatureIgnoringLHSToHGNodeMap;
+  // to maintain uniqueness of nodes
+  private final Map<HGNode.Signature, HGNode> nodesSignatureMap;
 
   private RestrictLabeledVersionsLanguageModelStatePruning(
-      Map<SignatureIgnoringLHS, RestrictedSizeBestHGNodeSet> signatureIgnoringLHSToHGNodeMap) {
+      Map<SignatureIgnoringLHS, RestrictedSizeBestHGNodeSet> signatureIgnoringLHSToHGNodeMap,
+      Map<HGNode.Signature, HGNode> nodesSignatureMap) {
     this.signatureIgnoringLHSToHGNodeMap = signatureIgnoringLHSToHGNodeMap;
+    this.nodesSignatureMap = nodesSignatureMap;
   }
 
   public static RestrictLabeledVersionsLanguageModelStatePruning createRestrictLabeledVersionsLanguageModelStatePruning() {
     Map<SignatureIgnoringLHS, RestrictedSizeBestHGNodeSet> signatureIgnoringLHSToHGNodeMap = new HashMap<>();
-    return new RestrictLabeledVersionsLanguageModelStatePruning(signatureIgnoringLHSToHGNodeMap);
+    Map<HGNode.Signature, HGNode> nodesSignatureTable = new HashMap<>();
+    return new RestrictLabeledVersionsLanguageModelStatePruning(signatureIgnoringLHSToHGNodeMap,
+        nodesSignatureTable);
   }
 
   private RestrictedSizeBestHGNodeSet getOrPutAndGetRestrictedSizeBestHGNodeSet(
@@ -31,20 +40,58 @@ public class RestrictLabeledVersionsLanguageModelStatePruning {
     }
   }
 
+  protected boolean nodeWithSameSignatureExistedBeforehand(HGNode hgNode) {
+    HGNode.Signature signature = hgNode.signature();
+    if (this.nodesSignatureMap.containsKey(signature)) {
+      return true;
+    }
+    return false;
+  }
+
+  public void putHGNodeSignature(HGNode.Signature signature, HGNode hgNode) {
+    this.nodesSignatureMap.put(signature, hgNode);
+  }
+
+  public void removeHGNodeWithSignature(HGNode.Signature signature) {
+    this.nodesSignatureMap.remove(signature);
+  }
+
+  public HGNode getHGNodeWithSignature(HGNode.Signature signature) {
+    return this.nodesSignatureMap.get(signature);
+  }
+
   public HGNode addHGNodeAndReturnRemovedNodeIfAny(HGNode hgNode) {
     SignatureIgnoringLHS signatureIgnoringLHS = new SignatureIgnoringLHS(hgNode);
     RestrictedSizeBestHGNodeSet restrictedSizeBestHGNodeSet = getOrPutAndGetRestrictedSizeBestHGNodeSet(
         signatureIgnoringLHS);
-    HGNode removedNode = restrictedSizeBestHGNodeSet.addNodeAndReturnRemovedNode(hgNode);
+    HGNode removedNode = restrictedSizeBestHGNodeSet.addNodeAndReturnRemovedNode(hgNode, this);
 
-    if (removedNode != null) {
-      System.err.println("Gideon: removed node: " + removedNode);
-    }
+    // if (removedNode != null) {
+    // System.err.println("Gideon: removed node: " + removedNode);
+    // }
 
     return removedNode;
   }
 
-  private static class SignatureIgnoringLHS {
+  /**
+   * Print a node addition report, to get an idea about the effect of 
+   * restricting the number of labeled versions per language model state
+   */
+  public void showNodeAdditionReport() {
+    System.err.println("\n<NodeAdditionReport>");
+    System.err.println("nodesAddedWithExistingSignature  , nodesAddedWithNewSignature  , finalNumberOfLabelings");
+    for (Entry<SignatureIgnoringLHS, RestrictedSizeBestHGNodeSet> restrictedSizeBestHGNodeSet : this.signatureIgnoringLHSToHGNodeMap
+        .entrySet()) {
+      NodeAdditionReport nodeAdditionReport = restrictedSizeBestHGNodeSet.getValue()
+          .getFinalNodeAdditionReport();
+      //System.err.println(
+       //   nodeAdditionReport.getNodeAdditionReportString(restrictedSizeBestHGNodeSet.getKey()));
+      System.err.println(nodeAdditionReport.getNodeAdditionReportStringDense(restrictedSizeBestHGNodeSet.getKey()));
+    }
+    System.err.println("</NodeAdditionReport>");
+  }
+
+  static class SignatureIgnoringLHS {
 
     protected final HGNode hgNode;
 

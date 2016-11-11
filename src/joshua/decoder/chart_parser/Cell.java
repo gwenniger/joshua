@@ -143,12 +143,7 @@ class Cell {
 //        System.err.println(String.format("  -> TAIL %s", ants.get(xi)));
 //      }
 //    }
-
-    List<DPState> dpStates = result.getDPStates();
-    float pruningEstimate = result.getPruningEstimate();
-    float transitionLogP = result.getTransitionCost();
-    float finalizedTotalLogP = result.getViterbiCost();
-
+   
     /**
      * Here, the edge has passed pre-pruning. The edge will be added to the chart in one of three
      * ways:
@@ -159,54 +154,90 @@ class Cell {
      * 2. If there is an existing node, the edge will be added to its list of incoming hyperedges,
      * possibly taking place as the best incoming hyperedge for that node.
      */
-
-    HyperEdge hyperEdge = new HyperEdge(rule, finalizedTotalLogP, transitionLogP, ants, srcPath);
-    HGNode newNode = new HGNode(i, j, rule.getLHS(), dpStates, hyperEdge, pruningEstimate);
+   
+    HGNode newNode = createNewHGNode(result, rule, i, j, ants, srcPath);
 
     /**
      * each node has a list of hyperedges, need to check whether the node is already exist, if
      * yes, just add the hyperedges, this may change the best logP of the node
      * */
     HGNode oldNode = this.nodesSigTbl.get(newNode.signature());
+    addNode(oldNode,newNode);
+
+    return newNode;
+  }
+
+  private HGNode createNewHGNode(ComputeNodeResult result, Rule rule, int i, int j, List<HGNode> ants,
+      SourcePath srcPath){
+    List<DPState> dpStates = result.getDPStates();
+    float pruningEstimate = result.getPruningEstimate();
+    float transitionLogP = result.getTransitionCost();
+    float finalizedTotalLogP = result.getViterbiCost();
+    HyperEdge hyperEdge = new HyperEdge(rule, finalizedTotalLogP, transitionLogP, ants, srcPath);
+    HGNode newNode = new HGNode(i, j, rule.getLHS(), dpStates, hyperEdge, pruningEstimate);
+    return newNode;
+  }
+  
+  private void addNode(HGNode oldNode, HGNode newNode){
     if (null != oldNode) { // have an item with same states, combine items
-      this.chart.nMerged++;
-
-      /**
-       * the position of oldItem in this.heapItems may change, basically, we should remove the
-       * oldItem, and re-insert it (linear time), this is too expensive)
-       **/
-      if (newNode.getScore() > oldNode.getScore()) { // merge old to new: semiring plus
-
-        newNode.addHyperedgesInNode(oldNode.hyperedges);
-        // This will update the HashMap, so that the oldNode is destroyed.
-        addNewNode(newNode);
-      } else {// merge new to old, does not trigger pruningItems
-        oldNode.addHyperedgesInNode(newNode.hyperedges);
-      }
-
+      addNodeWithStateThatExists(oldNode, newNode);
     } else { // first time item
       this.chart.nAdded++; // however, this item may not be used in the future due to pruning in
       // the hyper-graph
       addNewNode(newNode);
     }
-
-    return newNode;
   }
+  
+  private void addNodeWithStateThatExists(HGNode oldNode, HGNode newNode){
+    this.chart.nMerged++;
 
+    /**
+     * the position of oldItem in this.heapItems may change, basically, we should remove the
+     * oldItem, and re-insert it (linear time), this is too expensive)
+     **/
+    if (newNode.getScore() > oldNode.getScore()) { // merge old to new: semiring plus
+
+      newNode.addHyperedgesInNode(oldNode.hyperedges);
+      // This will update the HashMap, so that the oldNode is destroyed.
+      addNewNode(newNode);
+    } else {// merge new to old, does not trigger pruningItems
+      oldNode.addHyperedgesInNode(newNode.hyperedges);
+    }
+  }
+  
   HGNode addHyperEdgeInCellRestrictingMaxNumberLabelingsPerLanguageModelState(ComputeNodeResult result, Rule rule, int i, int j, List<HGNode> ants,
       SourcePath srcPath, boolean noPrune,RestrictLabeledVersionsLanguageModelStatePruning restrictLabeledVersionsLanguageModelStatePruning) {
-    // System.err.println(">>>addHyperEdgeInCellRestrictingMaxNumberLabelingsPerLanguageModelState...");
-     
-     if(ants == null){
-       throw new RuntimeException("Gideon: >>> Error: ants is null!!!");
-     }
-     
-     HGNode resultHGNode =  addHyperEdgeInCell(result, rule, i, j, ants, srcPath, noPrune);
-     HGNode toBeRemovedNode = restrictLabeledVersionsLanguageModelStatePruning.addHGNodeAndReturnRemovedNodeIfAny(resultHGNode);
+      // System.err.println(">>>addHyperEdgeInCellRestrictingMaxNumberLabelingsPerLanguageModelState...");
+       
+       if(ants == null){
+         throw new RuntimeException("Gideon: >>> Error: ants is null!!!");     
+       }    
+    
+     /**
+      * Here, the edge has passed pre-pruning. The edge will be added to the chart in one of three
+      * ways:
+      * 
+      * 1. If there is no existing node, a new one gets created and the edge is its only incoming
+      * hyperedge.
+      * 
+      * 2. If there is an existing node, the edge will be added to its list of incoming hyperedges,
+      * possibly taking place as the best incoming hyperedge for that node.
+      */
+    
+     HGNode newNode = createNewHGNode(result, rule, i, j, ants, srcPath);
+  
+     /**
+      * each node has a list of hyperedges, need to check whether the node is already exist, if
+      * yes, just add the hyperedges, this may change the best logP of the node
+      * */
+     HGNode oldNode = this.nodesSigTbl.get(newNode.signature());
+     addNode(oldNode,newNode);
+                 
+     HGNode toBeRemovedNode = restrictLabeledVersionsLanguageModelStatePruning.addHGNodeAndReturnRemovedNodeIfAny(newNode);
      if(toBeRemovedNode != null){
        removeNode(toBeRemovedNode);
      }
-     return resultHGNode;
+     return newNode;
   }
 
   
@@ -255,7 +286,7 @@ class Cell {
    * @param node
    */
   private void removeNode(HGNode node) {
-    System.err.println("Removing node: " + node);
+    //System.err.println("Removing node: " + node);
     SuperNode si = this.superNodesTbl.get(node.lhs);   
     si.nodes.remove(node);
     this.nodesSigTbl.remove(node.signature());
