@@ -202,16 +202,15 @@ public class JoshuaConfiguration {
   public boolean fuzzy_matching = false;
   public boolean remove_labels_inside_grammar_trie_for_more_efficient_fuzzy_matching = false;
   public boolean explore_all_distinct_labled_rule_versions_in_cube_pruning_initialization = false;
+  public boolean explore_all_labels_for_glue_rules_in_cube_pruning_initialization;
+  public boolean  explore_all_possible_label_substitutions_for_all_rules_in_cube_pruning_initialization;
 
   public static final String SOFT_SYNTACTIC_CONSTRAINT_DECODING_PROPERTY_NAME = "fuzzy_matching";
   public static final String REMOVE_LABELS_INSIDE_GRAMMAR_TRIE_FOR_MORE_EFFICIENT_FUZZY_MATCHING_PROPERTY_NAME = "remove_labels_inside_grammar_trie_for_more_efficient_fuzzy_matching";
   public static final String EXPLORE_ALL_DISTINCT_LABLED_RULE_VERSIONS_IN_CUBE_PRUNING_INITIALIZATION_PROPERTY_NAME = "explore_all_distinct_labled_rule_versions_in_cube_pruning_initialization";
-  
-  
-  public boolean explore_all_labels_for_glue_rules_in_cube_pruning_initialization;
   public static final String EXPLORE_ALL_LABELS_FOR_GLUE_RULES_IN_CUBE_PRUNING_INITIALIZATION_PROPERTY_NAME = "explore_all_labels_for_glue_rules_in_cube_pruning_initialization";
   public static final String EXPLORE_ALL_POSSIBLE_LABEL_SUBSTITUTIONS_FOR_ALL_RULES_IN_CUBE_PRUNING_INITIALIZATION_PROPERTY_NAME = "explore_all_possible_label_substitutions_for_all_rules_in_cube_pruning_initialization";
-  public boolean  explore_all_possible_label_substitutions_for_all_rules_in_cube_pruning_initialization;
+  
   
   /*
    * Whether to use separate cube pruning states for matching substitutions. This is only applicable 
@@ -221,6 +220,15 @@ public class JoshuaConfiguration {
    */
   public boolean separate_cube_pruning_states_for_matching_substitutions = false;
   public static final String SEPARATE_CUBE_PRUNING_STATES_MATCHING_SUBSTITUTIONS_PROPERTY_NAME = "separate_cube_pruning_states_for_matching_substitutions";
+  
+  
+  /*
+   * A maximum number of labeled versions per language model state and cell can be specified. This
+   * is to reduce parsing complexity, and thereby decoding time, and hopefully also improve results,
+   * when working with large label sets.
+   */
+  public int max_number_alternative_labeled_versions_per_language_model_state = 0;
+  public static final String MAX_NUMBER_ALTERNATIVE_LABELED_VERSIONS_PER_LANGUAGE_MODEL_STATE = "max_number_alternative_labeled_versions_per_language_model_state";
 
   /***
    * Phrase-based decoding parameters.
@@ -613,6 +621,12 @@ public class JoshuaConfiguration {
               .equals(normalize_key(EXPLORE_ALL_POSSIBLE_LABEL_SUBSTITUTIONS_FOR_ALL_RULES_IN_CUBE_PRUNING_INITIALIZATION_PROPERTY_NAME))) {
             explore_all_possible_label_substitutions_for_all_rules_in_cube_pruning_initialization = Boolean.parseBoolean(fds[1]);
             logger.finest(String.format(EXPLORE_ALL_POSSIBLE_LABEL_SUBSTITUTIONS_FOR_ALL_RULES_IN_CUBE_PRUNING_INITIALIZATION_PROPERTY_NAME + ": %s",  explore_all_possible_label_substitutions_for_all_rules_in_cube_pruning_initialization));
+
+          } 
+          else if (parameter
+              .equals(normalize_key(MAX_NUMBER_ALTERNATIVE_LABELED_VERSIONS_PER_LANGUAGE_MODEL_STATE))) {
+            max_number_alternative_labeled_versions_per_language_model_state = Integer.parseInt(fds[1]);
+            logger.finest(String.format(MAX_NUMBER_ALTERNATIVE_LABELED_VERSIONS_PER_LANGUAGE_MODEL_STATE + ": %s",  max_number_alternative_labeled_versions_per_language_model_state));
 
           } 
           else if (parameter.equals(normalize_key("fragment-map"))) {

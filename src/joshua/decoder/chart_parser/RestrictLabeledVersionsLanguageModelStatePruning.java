@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import joshua.decoder.JoshuaConfiguration;
 import joshua.decoder.chart_parser.RestrictedSizeBestHGNodeSet.NodeAdditionReport;
 import joshua.decoder.ff.state_maintenance.DPState;
 import joshua.decoder.hypergraph.HGNode;
@@ -13,19 +14,22 @@ public class RestrictLabeledVersionsLanguageModelStatePruning {
   private final Map<SignatureIgnoringLHS, RestrictedSizeBestHGNodeSet> signatureIgnoringLHSToHGNodeMap;
   // to maintain uniqueness of nodes
   private final Map<HGNode.Signature, HGNode> nodesSignatureMap;
+  private final JoshuaConfiguration joshuaConfiguration;
 
   private RestrictLabeledVersionsLanguageModelStatePruning(
       Map<SignatureIgnoringLHS, RestrictedSizeBestHGNodeSet> signatureIgnoringLHSToHGNodeMap,
-      Map<HGNode.Signature, HGNode> nodesSignatureMap) {
+      Map<HGNode.Signature, HGNode> nodesSignatureMap, JoshuaConfiguration joshuaConfiguration) {
     this.signatureIgnoringLHSToHGNodeMap = signatureIgnoringLHSToHGNodeMap;
     this.nodesSignatureMap = nodesSignatureMap;
+    this.joshuaConfiguration = joshuaConfiguration;
   }
 
-  public static RestrictLabeledVersionsLanguageModelStatePruning createRestrictLabeledVersionsLanguageModelStatePruning() {
+  public static RestrictLabeledVersionsLanguageModelStatePruning createRestrictLabeledVersionsLanguageModelStatePruning(
+      JoshuaConfiguration joshuaConfiguration) {
     Map<SignatureIgnoringLHS, RestrictedSizeBestHGNodeSet> signatureIgnoringLHSToHGNodeMap = new HashMap<>();
     Map<HGNode.Signature, HGNode> nodesSignatureTable = new HashMap<>();
     return new RestrictLabeledVersionsLanguageModelStatePruning(signatureIgnoringLHSToHGNodeMap,
-        nodesSignatureTable);
+        nodesSignatureTable, joshuaConfiguration);
   }
 
   private RestrictedSizeBestHGNodeSet getOrPutAndGetRestrictedSizeBestHGNodeSet(
@@ -34,7 +38,8 @@ public class RestrictLabeledVersionsLanguageModelStatePruning {
       return signatureIgnoringLHSToHGNodeMap.get(signatureIgnoringLHS);
     } else {
       RestrictedSizeBestHGNodeSet result = RestrictedSizeBestHGNodeSet
-          .createRestrictedSizeBestHGNodeSet();
+          .createRestrictedSizeBestHGNodeSet(
+              joshuaConfiguration.max_number_alternative_labeled_versions_per_language_model_state);
       signatureIgnoringLHSToHGNodeMap.put(signatureIgnoringLHS, result);
       return result;
     }
@@ -74,19 +79,21 @@ public class RestrictLabeledVersionsLanguageModelStatePruning {
   }
 
   /**
-   * Print a node addition report, to get an idea about the effect of 
-   * restricting the number of labeled versions per language model state
+   * Print a node addition report, to get an idea about the effect of restricting the number of
+   * labeled versions per language model state
    */
   public void showNodeAdditionReport() {
     System.err.println("\n<NodeAdditionReport>");
-    System.err.println("nodesAddedWithExistingSignature  , nodesAddedWithNewSignature  , finalNumberOfLabelings");
+    System.err.println(
+        "nodesAddedWithExistingSignature  , nodesAddedWithNewSignature  , finalNumberOfLabelings");
     for (Entry<SignatureIgnoringLHS, RestrictedSizeBestHGNodeSet> restrictedSizeBestHGNodeSet : this.signatureIgnoringLHSToHGNodeMap
         .entrySet()) {
       NodeAdditionReport nodeAdditionReport = restrictedSizeBestHGNodeSet.getValue()
           .getFinalNodeAdditionReport();
-      //System.err.println(
-       //   nodeAdditionReport.getNodeAdditionReportString(restrictedSizeBestHGNodeSet.getKey()));
-      System.err.println(nodeAdditionReport.getNodeAdditionReportStringDense(restrictedSizeBestHGNodeSet.getKey()));
+      // System.err.println(
+      // nodeAdditionReport.getNodeAdditionReportString(restrictedSizeBestHGNodeSet.getKey()));
+      System.err.println(nodeAdditionReport
+          .getNodeAdditionReportStringDense(restrictedSizeBestHGNodeSet.getKey()));
     }
     System.err.println("</NodeAdditionReport>");
   }

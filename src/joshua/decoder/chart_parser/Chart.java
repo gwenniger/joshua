@@ -312,7 +312,11 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
    * @return
    */
   private boolean restrictNumberOfLabelingsPerLanguageModelState(){
-    return true;
+    return maxNumLabeledVersionsPerLanguageModelState() > 0;
+  }
+  
+  private int maxNumLabeledVersionsPerLanguageModelState(){
+    return config.max_number_alternative_labeled_versions_per_language_model_state;
   }
   
   
@@ -1225,10 +1229,9 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
            **/
           this.dotcharts[k].expandDotCell(i, j);
         }
-
         
         RestrictLabeledVersionsLanguageModelStatePruning restrictLabeledVersionsLanguageModelStatePruning =  
-            RestrictLabeledVersionsLanguageModelStatePruning.createRestrictLabeledVersionsLanguageModelStatePruning(); 
+            RestrictLabeledVersionsLanguageModelStatePruning.createRestrictLabeledVersionsLanguageModelStatePruning(config); 
                 
         /*
          * 2. The regular CKY part: add completed items onto the chart via cube

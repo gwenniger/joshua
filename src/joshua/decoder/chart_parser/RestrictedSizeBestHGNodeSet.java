@@ -11,18 +11,21 @@ import joshua.decoder.hypergraph.HGNode;
  *
  */
 public class RestrictedSizeBestHGNodeSet {
-
-  private static final int MAX_NUM_LABELED_VERSIONS_PER_LM_STATE = 5;
   private final TreeMap<HGNode, HGNode> hgNodes;
   private final NodeAdditionReport nodeAdditionReport;
+  private final int max_number_alternative_labeled_versions_per_language_model_state;
 
-  private RestrictedSizeBestHGNodeSet(TreeMap<HGNode, HGNode> hgNodes) {
+  private RestrictedSizeBestHGNodeSet(TreeMap<HGNode, HGNode> hgNodes,
+      int max_number_alternative_labeled_versions_per_language_model_state) {
     this.hgNodes = hgNodes;
     this.nodeAdditionReport = new NodeAdditionReport();
+    this.max_number_alternative_labeled_versions_per_language_model_state = max_number_alternative_labeled_versions_per_language_model_state;
   }
 
-  public static RestrictedSizeBestHGNodeSet createRestrictedSizeBestHGNodeSet() {
-    return new RestrictedSizeBestHGNodeSet(new TreeMap<>(inverseLogComparator()));
+  public static RestrictedSizeBestHGNodeSet createRestrictedSizeBestHGNodeSet(
+      int max_number_alternative_labeled_versions_per_language_model_state) {
+    return new RestrictedSizeBestHGNodeSet(new TreeMap<>(inverseLogComparator()),
+        max_number_alternative_labeled_versions_per_language_model_state);
   }
 
   /**
@@ -74,8 +77,9 @@ public class RestrictedSizeBestHGNodeSet {
     }
 
     if (HGNode.logPComparator.compare(existingNodeWithSameSignature, newHGNode) < 0) {
-      
-      assertFirstHGNodeHasProbabilityEqualOrHigerThanLastKey(newHGNode,existingNodeWithSameSignature);
+
+      assertFirstHGNodeHasProbabilityEqualOrHigerThanLastKey(newHGNode,
+          existingNodeWithSameSignature);
       // System.err.println("\nFound node: \n" + newHGNode
       // + "\nwith better score than existing node:\n" + existingNodeWithSameSignature + "\n");
 
@@ -102,7 +106,7 @@ public class RestrictedSizeBestHGNodeSet {
     nodeAdditionReport.incrementNodesAddedWithNewSignature();
 
     HGNode removedNode = null;
-    if (hgNodes.size() < MAX_NUM_LABELED_VERSIONS_PER_LM_STATE) {
+    if (hgNodes.size() < max_number_alternative_labeled_versions_per_language_model_state) {
       hgNodes.put(newHGNode, newHGNode);
       restrictLabeledVersionsLanguageModelStatePruning.putHGNodeSignature(newHGNode.signature(),
           newHGNode);
@@ -138,9 +142,8 @@ public class RestrictedSizeBestHGNodeSet {
   }
 
   /**
-   * Method to sanity check of the sorting order: 
-   * check that the first key in the TreeSet has indeed the highest probability
-   * and not the last one
+   * Method to sanity check of the sorting order: check that the first key in the TreeSet has indeed
+   * the highest probability and not the last one
    */
   private void assertFirsKeyHasProbabilityEqualOrHigerThanLastKey() {
     if (this.hgNodes.firstKey().getScore() < this.hgNodes.lastKey().getScore()) {
@@ -151,6 +154,7 @@ public class RestrictedSizeBestHGNodeSet {
 
   /**
    * Method to sanity check that we are indeed keeping the highest scoring HGNode
+   * 
    * @param first
    * @param second
    */
