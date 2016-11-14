@@ -1,6 +1,9 @@
 package joshua.decoder.chart_parser;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -82,16 +85,34 @@ public class RestrictLabeledVersionsLanguageModelStatePruning {
    * Print a node addition report, to get an idea about the effect of restricting the number of
    * labeled versions per language model state
    */
-  public void showNodeAdditionReport() {
-    System.err.println("\n<NodeAdditionReport>");
-    System.err.println(
-        "nodesAddedWithExistingSignature  , nodesAddedWithNewSignature  , finalNumberOfLabelings");
+  public NodeAdditionStatistics collectNodeAdditionStatistics() {
+    NodeAdditionStatistics result = NodeAdditionStatistics.createNodeAdditionStatistics();
+
     for (Entry<SignatureIgnoringLHS, RestrictedSizeBestHGNodeSet> restrictedSizeBestHGNodeSet : this.signatureIgnoringLHSToHGNodeMap
         .entrySet()) {
       NodeAdditionReport nodeAdditionReport = restrictedSizeBestHGNodeSet.getValue()
           .getFinalNodeAdditionReport();
-      // System.err.println(
-      // nodeAdditionReport.getNodeAdditionReportString(restrictedSizeBestHGNodeSet.getKey()));
+      result.addNodeAdditionReport(nodeAdditionReport);
+    }
+    return result;
+  }
+
+  /**
+   * Print a node addition report, to get an idea about the effect of restricting the number of
+   * labeled versions per language model state
+   */
+  public void showNodeAdditionReport() {
+    System.err.println("\n<NodeAdditionReport>");
+    System.err.println(
+        "nodesAddedWithExistingSignature  , nodesAddedWithNewSignature  , finalNumberOfLabelings");
+
+    for (Entry<SignatureIgnoringLHS, RestrictedSizeBestHGNodeSet> restrictedSizeBestHGNodeSet : this.signatureIgnoringLHSToHGNodeMap
+        .entrySet()) {
+      NodeAdditionReport nodeAdditionReport = restrictedSizeBestHGNodeSet.getValue()
+          .getFinalNodeAdditionReport();
+
+      System.err.println(
+          nodeAdditionReport.getNodeAdditionReportString(restrictedSizeBestHGNodeSet.getKey()));
       System.err.println(nodeAdditionReport
           .getNodeAdditionReportStringDense(restrictedSizeBestHGNodeSet.getKey()));
     }
@@ -147,4 +168,80 @@ public class RestrictLabeledVersionsLanguageModelStatePruning {
     }
   }
 
+  protected static class NodeAdditionStatistics {
+    private final List<Integer> nodesAddedWithExistingSignatureList;
+    private final List<Integer> nodesAddedWithNewSignatureList;
+    private final List<Integer> finalNumberOfLabelingsList;
+
+    private NodeAdditionStatistics(List<Integer> nodesAddedWithExistingSignatureList,
+        List<Integer> nodesAddedWithNewSignatureList, List<Integer> finalNumberOfLabelingsList) {
+      this.nodesAddedWithExistingSignatureList = nodesAddedWithExistingSignatureList;
+      this.nodesAddedWithNewSignatureList = nodesAddedWithNewSignatureList;
+      this.finalNumberOfLabelingsList = finalNumberOfLabelingsList;
+    }
+
+    public static NodeAdditionStatistics createNodeAdditionStatistics() {
+      return new NodeAdditionStatistics(new ArrayList<Integer>(), new ArrayList<Integer>(),
+          new ArrayList<Integer>());
+    }
+
+    public List<Integer> getNodesAddedWithExistingSignatureList() {
+      return this.nodesAddedWithExistingSignatureList;
+    }
+
+    public List<Integer> getNodesAddedWithNewSignatureList() {
+      return this.nodesAddedWithNewSignatureList;
+    }
+
+    public List<Integer> getFinalNumberOfLabelingsList() {
+      return this.finalNumberOfLabelingsList;
+    }
+
+    public void addNodeAdditionReport(NodeAdditionReport nodeAdditionReport) {
+      this.nodesAddedWithExistingSignatureList
+          .add(nodeAdditionReport.getNodesAddedWithExistingSignature());
+      this.nodesAddedWithNewSignatureList.add(nodeAdditionReport.getNodesAddedWithNewSignature());
+      this.finalNumberOfLabelingsList.add(nodeAdditionReport.getFinalNumberOfLabelings());
+    }
+
+    public void addNodeAdditionStatistics(NodeAdditionStatistics nodeAdditionStatistics) {
+      this.nodesAddedWithExistingSignatureList
+          .addAll(nodeAdditionStatistics.getNodesAddedWithExistingSignatureList());
+      this.nodesAddedWithNewSignatureList
+          .addAll(nodeAdditionStatistics.getNodesAddedWithNewSignatureList());
+      this.finalNumberOfLabelingsList
+          .addAll(nodeAdditionStatistics.getFinalNumberOfLabelingsList());
+    }
+
+    private String getMinMaxMeanStdString(List<Integer> integerList) {
+      return "" + Collections.min(integerList) + "," + Collections.max(integerList) + ","
+          + MeanStdComputation.computeIntsMean(integerList) + ","
+          + MeanStdComputation.computeIntsStd(integerList) + "\n";
+    }
+
+    private String getNodesAddedWithExistingSignatureStatisticsString() {
+      return "Nodes added with existing signature: "
+          + getMinMaxMeanStdString(nodesAddedWithExistingSignatureList);
+    }
+
+    private String getNodesAddedWithNewSignatureStatisticsString() {
+      return "Nodes added with new signature: "
+          + getMinMaxMeanStdString(nodesAddedWithNewSignatureList);
+    }
+
+    private String getFinalNumberOfLabelingsStatisticsString() {
+      return "Final number of labelings: " + getMinMaxMeanStdString(finalNumberOfLabelingsList);
+    }
+
+    public String getNodeAdditionStatitisticsReportString() {
+      String result = "<NodeAdditionStatistics>\n";
+      result += "DESCRIPTION , MIN, MAX, MEAN, STD" + "\n";
+      result += getNodesAddedWithExistingSignatureStatisticsString();
+      result += getNodesAddedWithNewSignatureStatisticsString();
+      result += getFinalNumberOfLabelingsStatisticsString();
+      result += "</NodeAdditionStatistics>\n";
+      return result;
+    }
+
+  }
 }

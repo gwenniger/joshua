@@ -20,6 +20,7 @@ import joshua.decoder.chart_parser.DotChart.DotNode;
 import joshua.decoder.chart_parser.DotChart.DotNodeBase;
 import joshua.decoder.chart_parser.DotChart.DotNodeMultiLabel;
 import joshua.decoder.chart_parser.DotChart.SuperNodeAlternativesSpecification;
+import joshua.decoder.chart_parser.RestrictLabeledVersionsLanguageModelStatePruning.NodeAdditionStatistics;
 import joshua.decoder.chart_parser.ValidAntNodeComputer.ValidAntNodeComputerBasic;
 import joshua.decoder.chart_parser.ValidAntNodeComputer.ValidAntNodeComputerFuzzyMatching;
 import joshua.decoder.chart_parser.ValidAntNodeComputer.ValidAntNodeComputerFuzzyMatchingFixedLabel;
@@ -1204,6 +1205,8 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
    */
   public HyperGraph expand() {
 
+    NodeAdditionStatistics nodeAdditionStatistics = NodeAdditionStatistics.createNodeAdditionStatistics();
+    
     for (int width = 1; width <= sourceLength; width++) {
       for (int i = 0; i <= sourceLength - width; i++) {
         int j = i + width;
@@ -1253,9 +1256,12 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
             this.dotcharts[k].startDotItems(i, j);
           }
         }
-
-        restrictLabeledVersionsLanguageModelStatePruning.showNodeAdditionReport();
         
+        if(restrictNumberOfLabelingsPerLanguageModelState()){
+          //restrictLabeledVersionsLanguageModelStatePruning.showNodeAdditionReport();
+          //Collection node addition statistics for this span, and add to the aggregate statistics
+          nodeAdditionStatistics.addNodeAdditionStatistics(restrictLabeledVersionsLanguageModelStatePruning.collectNodeAdditionStatistics());
+        }
         /*
          * 5. Sort the nodes in the cell.
          * 
@@ -1279,6 +1285,10 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
       return null;
     }
 
+    if(restrictNumberOfLabelingsPerLanguageModelState()){
+      System.err.println(nodeAdditionStatistics.getNodeAdditionStatitisticsReportString());
+    }  
+    
     logger.fine("Finished expand");
     return new HyperGraph(this.goalBin.getSortedNodes().get(0), -1, -1, this.sentence);
   }

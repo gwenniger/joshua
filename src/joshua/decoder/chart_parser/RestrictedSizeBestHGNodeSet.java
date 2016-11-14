@@ -202,6 +202,10 @@ public class RestrictedSizeBestHGNodeSet {
     public int getNodesAddedWithNewSignature() {
       return nodesAddedWithNewSignature;
     }
+    
+    public int getFinalNumberOfLabelings(){
+      return finalNumberOfLabelings;
+    }
 
     public void incrementNodesAddedWithNewSignature() {
       this.nodesAddedWithNewSignature++;
