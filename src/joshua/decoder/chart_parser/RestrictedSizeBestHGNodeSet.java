@@ -122,7 +122,8 @@ public class RestrictedSizeBestHGNodeSet {
       assertSignaturesAreDifferent(firstHGNode, newHGNode);
 
       if (HGNode.logPComparator.compare(firstHGNode, newHGNode) < 0) {
-        assertFirstHGNodeHasProbabilityEqualOrHigerThanLastKey(firstHGNode, newHGNode);
+        // Check that the newHGNode indeed has a higher probability than the first (current best)
+        assertFirstHGNodeHasProbabilityEqualOrHigerThanLastKey(newHGNode,firstHGNode);
 
         // System.err.println(">>> removing first node...");
         removedNode = hgNodes.pollFirstEntry().getKey();
