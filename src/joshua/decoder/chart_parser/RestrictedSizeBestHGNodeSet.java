@@ -1,6 +1,14 @@
 package joshua.decoder.chart_parser;
 
+import java.util.AbstractMap;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.Map;
+import java.util.NavigableMap;
+import java.util.NavigableSet;
+import java.util.Set;
+import java.util.SortedMap;
 import java.util.TreeMap;
 import joshua.decoder.hypergraph.HGNode;
 
@@ -11,11 +19,11 @@ import joshua.decoder.hypergraph.HGNode;
  *
  */
 public class RestrictedSizeBestHGNodeSet {
-  private final TreeMap<HGNode, HGNode> hgNodes;
+  private final NavigableMap<HGNode, HGNode> hgNodes;
   private final NodeAdditionReport nodeAdditionReport;
   private final int max_number_alternative_labeled_versions_per_language_model_state;
 
-  private RestrictedSizeBestHGNodeSet(TreeMap<HGNode, HGNode> hgNodes,
+  private RestrictedSizeBestHGNodeSet(NavigableMap<HGNode, HGNode> hgNodes,
       int max_number_alternative_labeled_versions_per_language_model_state) {
     this.hgNodes = hgNodes;
     this.nodeAdditionReport = new NodeAdditionReport();
@@ -24,8 +32,23 @@ public class RestrictedSizeBestHGNodeSet {
 
   public static RestrictedSizeBestHGNodeSet createRestrictedSizeBestHGNodeSet(
       int max_number_alternative_labeled_versions_per_language_model_state) {
-    return new RestrictedSizeBestHGNodeSet(new TreeMap<>(inverseLogComparator()),
+
+    return new RestrictedSizeBestHGNodeSet(
+        createNavigableMap(max_number_alternative_labeled_versions_per_language_model_state),
         max_number_alternative_labeled_versions_per_language_model_state);
+  }
+
+  private static NavigableMap<HGNode, HGNode> createNavigableMap(
+      int max_number_alternative_labeled_versions_per_language_model_state) {
+    if (max_number_alternative_labeled_versions_per_language_model_state == 1) {
+      /**
+       *  Use the special purpose SingletonElementNavigableMap class in the 
+       *  case we are keeping only one labeled version per LM state, as an optimization 
+       *  in order to save memory.
+       */
+      return new SingletonElementNavigableMap<HGNode, HGNode>();
+    }
+    return new TreeMap<>(inverseLogComparator());
   }
 
   /**
@@ -123,7 +146,7 @@ public class RestrictedSizeBestHGNodeSet {
 
       if (HGNode.logPComparator.compare(firstHGNode, newHGNode) < 0) {
         // Check that the newHGNode indeed has a higher probability than the first (current best)
-        assertFirstHGNodeHasProbabilityEqualOrHigerThanLastKey(newHGNode,firstHGNode);
+        assertFirstHGNodeHasProbabilityEqualOrHigerThanLastKey(newHGNode, firstHGNode);
 
         // System.err.println(">>> removing first node...");
         removedNode = hgNodes.pollFirstEntry().getKey();
@@ -203,8 +226,8 @@ public class RestrictedSizeBestHGNodeSet {
     public int getNodesAddedWithNewSignature() {
       return nodesAddedWithNewSignature;
     }
-    
-    public int getFinalNumberOfLabelings(){
+
+    public int getFinalNumberOfLabelings() {
       return finalNumberOfLabelings;
     }
 
@@ -234,6 +257,236 @@ public class RestrictedSizeBestHGNodeSet {
           + finalNumberOfLabelings + " , " + signatureIgnoringLHS.hgNode.toString();
     }
 
+  }
+
+  /**
+   * This special purpose NavigableMap saves memory when only a single element is used
+   * 
+   * @author gemaille
+   *
+   * @param <K>
+   * @param <V>
+   */
+  protected static class SingletonElementNavigableMap<K, V> implements NavigableMap<K, V> {
+    K key;
+    V value;
+
+    @Override
+    public Comparator<? super K> comparator() {
+      throw new RuntimeException("not implemented");
+    }
+
+    @Override
+    public K firstKey() {
+      return key;
+    }
+
+    @Override
+    public K lastKey() {
+      return key;
+    }
+
+    @Override
+    public Set<K> keySet() {
+      return Collections.singleton(key);
+    }
+
+    @Override
+    public Collection<V> values() {
+      return Collections.singleton(value);
+    }
+
+    @Override
+    public Set<java.util.Map.Entry<K, V>> entrySet() {
+      throw new RuntimeException("not implemented");
+    }
+
+    @Override
+    public int size() {
+      if (isEmpty()) {
+        return 0;
+      }
+      return 1;
+    }
+
+    @Override
+    public boolean isEmpty() {
+      return (this.key == null);
+    }
+
+    @Override
+    public boolean containsKey(Object key) {
+      return this.key.equals(key);
+    }
+
+    @Override
+    public boolean containsValue(Object value) {
+      return this.value.equals(value);
+    }
+
+    @Override
+    public V get(Object key) {
+      if (key.equals(key)) {
+        return value;
+      }
+
+      return null;
+    }
+
+    @Override
+    public V put(K key, V value) {
+      if (!isEmpty()) {
+        throw new RuntimeException("Not Emtpy!");
+      }
+      this.key = key;
+      this.value = value;
+      return value;
+    }
+
+    private void removeTheEntry() {
+      this.key = null;
+      this.value = null;
+    }
+
+    @Override
+    public V remove(Object key) {
+      V result = value;
+      removeTheEntry();
+      return result;
+    }
+
+    @Override
+    public void putAll(Map<? extends K, ? extends V> m) {
+      throw new RuntimeException("not implemented");
+
+    }
+
+    @Override
+    public void clear() {
+      removeTheEntry();
+    }
+
+    @Override
+    public java.util.Map.Entry<K, V> lowerEntry(K key) {
+      throw new RuntimeException("not implemented");
+    }
+
+    @Override
+    public K lowerKey(K key) {
+      throw new RuntimeException("not implemented");
+    }
+
+    @Override
+    public java.util.Map.Entry<K, V> floorEntry(K key) {
+      throw new RuntimeException("not implemented");
+    }
+
+    @Override
+    public K floorKey(K key) {
+      throw new RuntimeException("not implemented");
+    }
+
+    @Override
+    public java.util.Map.Entry<K, V> ceilingEntry(K key) {
+      throw new RuntimeException("not implemented");
+    }
+
+    @Override
+    public K ceilingKey(K key) {
+      throw new RuntimeException("not implemented");
+    }
+
+    @Override
+    public java.util.Map.Entry<K, V> higherEntry(K key) {
+      throw new RuntimeException("not implemented");
+    }
+
+    @Override
+    public K higherKey(K key) {
+      throw new RuntimeException("not implemented");
+    }
+
+    private java.util.Map.Entry<K, V> getEntry() {
+      if (key == null) {
+        return null;
+      }
+      return new AbstractMap.SimpleEntry<K, V>(key, value);
+    }
+
+    private java.util.Map.Entry<K, V> pollEntry() {
+      if (key == null) {
+        return null;
+      }
+      java.util.Map.Entry<K, V> result = getEntry();
+      removeTheEntry();
+      return result;
+    }
+
+    @Override
+    public java.util.Map.Entry<K, V> firstEntry() {
+      return getEntry();
+    }
+
+    @Override
+    public java.util.Map.Entry<K, V> lastEntry() {
+      return getEntry();
+    }
+
+    @Override
+    public java.util.Map.Entry<K, V> pollFirstEntry() {
+      return pollEntry();
+    }
+
+    @Override
+    public java.util.Map.Entry<K, V> pollLastEntry() {
+      return pollEntry();
+    }
+
+    @Override
+    public NavigableMap<K, V> descendingMap() {
+      throw new RuntimeException("not implemented");
+    }
+
+    @Override
+    public NavigableSet<K> navigableKeySet() {
+      throw new RuntimeException("not implemented");
+    }
+
+    @Override
+    public NavigableSet<K> descendingKeySet() {
+      throw new RuntimeException("not implemented");
+    }
+
+    @Override
+    public NavigableMap<K, V> subMap(K fromKey, boolean fromInclusive, K toKey,
+        boolean toInclusive) {
+      throw new RuntimeException("not implemented");
+    }
+
+    @Override
+    public NavigableMap<K, V> headMap(K toKey, boolean inclusive) {
+      throw new RuntimeException("not implemented");
+    }
+
+    @Override
+    public NavigableMap<K, V> tailMap(K fromKey, boolean inclusive) {
+      throw new RuntimeException("not implemented");
+    }
+
+    @Override
+    public SortedMap<K, V> subMap(K fromKey, K toKey) {
+      throw new RuntimeException("not implemented");
+    }
+
+    @Override
+    public SortedMap<K, V> headMap(K toKey) {
+      throw new RuntimeException("not implemented");
+    }
+
+    @Override
+    public SortedMap<K, V> tailMap(K fromKey) {
+      throw new RuntimeException("not implemented");
+    }
   }
 
   /*
