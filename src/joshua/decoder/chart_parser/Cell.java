@@ -276,7 +276,11 @@ class Cell {
       si = new SuperNode(node.lhs);
       this.superNodesTbl.put(node.lhs, si);
     }
-    si.nodes.add(node);// TODO what about the dead items?
+    
+    // Remark that it is not necessary to add the node here
+    // this can be done when ensureSorted() is called, which will anyway 
+    // refill the list.
+    //si.nodes.add(node);// TODO what about the dead items?
   }
   
   
@@ -287,8 +291,13 @@ class Cell {
    */
   private void removeNode(HGNode node) {
     //System.err.println("Removing node: " + node);
-    SuperNode si = this.superNodesTbl.get(node.lhs);   
-    si.nodes.remove(node);
+    //SuperNode si = this.superNodesTbl.get(node.lhs);
+    
+    // We avoid both adding and removing the nodes here. Nodes are only added by 
+    // ensureSorted() to the list of HGNodes under Supernode. 
+    // This removal is important to avoid, because it is expensive: O(n)
+    //si.nodes.remove(node);
+    
     this.nodesSigTbl.remove(node.signature());
     this.sortedNodes = null; // reset the list
   }
