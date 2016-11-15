@@ -42,9 +42,8 @@ public class RestrictedSizeBestHGNodeSet {
       int max_number_alternative_labeled_versions_per_language_model_state) {
     if (max_number_alternative_labeled_versions_per_language_model_state == 1) {
       /**
-       *  Use the special purpose SingletonElementNavigableMap class in the 
-       *  case we are keeping only one labeled version per LM state, as an optimization 
-       *  in order to save memory.
+       * Use the special purpose SingletonElementNavigableMap class in the case we are keeping only
+       * one labeled version per LM state, as an optimization in order to save memory.
        */
       return new SingletonElementNavigableMap<HGNode, HGNode>();
     }
@@ -96,7 +95,8 @@ public class RestrictedSizeBestHGNodeSet {
     HGNode existingNodeWithSameSignature = restrictLabeledVersionsLanguageModelStatePruning
         .getHGNodeWithSignature(newHGNode.signature());
     if (existingNodeWithSameSignature == null) {
-      throw new RuntimeException("Error: existingNodeWithSameSignature is null!!!");
+      System.err.println("Error: existingNodeWithSameSignature is null!!!");
+      System.exit(1);
     }
 
     if (HGNode.logPComparator.compare(existingNodeWithSameSignature, newHGNode) < 0) {
@@ -171,8 +171,9 @@ public class RestrictedSizeBestHGNodeSet {
    */
   private void assertFirsKeyHasProbabilityEqualOrHigerThanLastKey() {
     if (this.hgNodes.firstKey().getScore() < this.hgNodes.lastKey().getScore()) {
-      throw new RuntimeException(
-          "Error: Expected the first key to have highest probability, but is not true!");
+      System.err
+          .println("Error: Expected the first key to have highest probability, but is not true!");
+      System.exit(1);
     }
   }
 
@@ -184,15 +185,17 @@ public class RestrictedSizeBestHGNodeSet {
    */
   private void assertFirstHGNodeHasProbabilityEqualOrHigerThanLastKey(HGNode first, HGNode second) {
     if (first.getScore() < second.getScore()) {
-      throw new RuntimeException(
+      System.err.println(
           "Error: Expected the first HGNode to have highest probability, but is not true!");
+      System.exit(1);
     }
   }
 
   private void assertSignaturesAreDifferent(HGNode first, HGNode second) {
     if (first.signature().equals(second.signature())) {
-      throw new RuntimeException(
+      System.err.println(
           "Error: nodes are supposed to have different signature, but do not!!!");
+      System.exit(1);
     }
   }
 
