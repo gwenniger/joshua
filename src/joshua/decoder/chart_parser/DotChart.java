@@ -300,12 +300,16 @@ class DotChart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2>,T2
         //logger.info(" addEfficientMultiLabelDotItemsFuzzyMatching (1a)");
         addEfficientMultiLabelDotItemsFuzzyMatching(i, j, superNodesAlternativesSpecification,firstNeitherOOVNorGoalSymbolSuperNode,
             dotNode, skipUnary);
-      }else{
-        addDotItemsBasic(i, j, neitherOOVNorGoalSymbolSuperNodes, dotNode, skipUnary);
+        
+        // Finally add the OOV and Goal Supernodes with strict matching
+        addDotItemsBasic(i, j, oovAndGoalSymbolSuperNodes, dotNode, skipUnary);
+      }
+      else{
+        // Strict matching so nod need to split the superNodes into subsets, one for soft matching 
+        // and one for strict matching. Just do strict matching on the the full set "superNodes"
+        addDotItemsBasic(i, j, superNodes, dotNode, skipUnary);
         //logger.info("  addDotItemsBasic(i, j, neitherOOVNorGoalSymbolSuperNodes, dotNode, skipUnary) (1b)");
       }     
-      addDotItemsBasic(i, j, oovAndGoalSymbolSuperNodes, dotNode, skipUnary);
-      //logger.info(" addDotItemsBasic(i, j, oovAndGoalSymbolSuperNodes, dotNode, skipUnary) (2)");
     }
   }
   
