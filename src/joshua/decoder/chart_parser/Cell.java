@@ -277,10 +277,10 @@ class Cell {
       this.superNodesTbl.put(node.lhs, si);
     }
     
-    // Remark that it is not necessary to add the node here
-    // this can be done when ensureSorted() is called, which will anyway 
-    // refill the list.
-    //si.nodes.add(node);// TODO what about the dead items?
+    // Remark that adding the node here is still necessary for the case of decoding without 
+    // dot chart, because this method may query the supernode's node list before 
+    // ensureSorted is called (the latter method will recalculate the node list)
+    si.nodes.add(node);// TODO what about the dead items?
   }
   
   
