@@ -205,12 +205,30 @@ public class JoshuaConfiguration {
   public boolean explore_all_labels_for_glue_rules_in_cube_pruning_initialization;
   public boolean  explore_all_possible_label_substitutions_for_all_rules_in_cube_pruning_initialization;
 
+  /*
+   * Whether to shuffle the rules before adding them to the initial cube pruning queue. The motivation
+   * is that when the other feature "explore_all_distinct_labled_rule_versions_in_cube_pruning_initialization"
+   * is used, shuffling avoids that all different labeled versions of the same Hiero rule type stay 
+   * together if they have the same scores (which is likely, essentially in the beginning of tuning
+   * when label substitution weights are not set yet). A higher variation in the order of rules
+   * with the same scores has turned out to be beneficial. 
+   * Note: this feature does not change the order based on the scoring of the applied rules, it just 
+   * change the relative order of applied rules with the same scores (ties), which does eventually
+   * also have an effect on which rules get added and extended further during cube pruning.
+   * 
+   * Because it is expected and has been observed that this feature has either a neutral or positive effect,
+   * it is turned on by default.
+   * But we do also add the option to turn this feature off, because this allows to test the 
+   * effect of not using it. 
+   */
+  public boolean use_shuffling_to_randomize_rule_order_of_adding_rules_to_initial_cube_pruning_queue = true;
+  
   public static final String SOFT_SYNTACTIC_CONSTRAINT_DECODING_PROPERTY_NAME = "fuzzy_matching";
   public static final String REMOVE_LABELS_INSIDE_GRAMMAR_TRIE_FOR_MORE_EFFICIENT_FUZZY_MATCHING_PROPERTY_NAME = "remove_labels_inside_grammar_trie_for_more_efficient_fuzzy_matching";
   public static final String EXPLORE_ALL_DISTINCT_LABLED_RULE_VERSIONS_IN_CUBE_PRUNING_INITIALIZATION_PROPERTY_NAME = "explore_all_distinct_labled_rule_versions_in_cube_pruning_initialization";
   public static final String EXPLORE_ALL_LABELS_FOR_GLUE_RULES_IN_CUBE_PRUNING_INITIALIZATION_PROPERTY_NAME = "explore_all_labels_for_glue_rules_in_cube_pruning_initialization";
   public static final String EXPLORE_ALL_POSSIBLE_LABEL_SUBSTITUTIONS_FOR_ALL_RULES_IN_CUBE_PRUNING_INITIALIZATION_PROPERTY_NAME = "explore_all_possible_label_substitutions_for_all_rules_in_cube_pruning_initialization";
-  
+  public static final String USE_SHUFFLING_TO_RANDOMIZE_RULE_ORDER_OF_ADDING_RULES_TO_INITIAL_CUBE_PRUNING_QUEUE = "use_shuffling"; 
   
   /*
    * Whether to use separate cube pruning states for matching substitutions. This is only applicable 
@@ -622,6 +640,11 @@ public class JoshuaConfiguration {
             explore_all_possible_label_substitutions_for_all_rules_in_cube_pruning_initialization = Boolean.parseBoolean(fds[1]);
             logger.finest(String.format(EXPLORE_ALL_POSSIBLE_LABEL_SUBSTITUTIONS_FOR_ALL_RULES_IN_CUBE_PRUNING_INITIALIZATION_PROPERTY_NAME + ": %s",  explore_all_possible_label_substitutions_for_all_rules_in_cube_pruning_initialization));
 
+          }
+          else if (parameter
+              .equals(normalize_key(USE_SHUFFLING_TO_RANDOMIZE_RULE_ORDER_OF_ADDING_RULES_TO_INITIAL_CUBE_PRUNING_QUEUE))) {
+            use_shuffling_to_randomize_rule_order_of_adding_rules_to_initial_cube_pruning_queue = Boolean.parseBoolean(fds[1]);
+            logger.finest(String.format(USE_SHUFFLING_TO_RANDOMIZE_RULE_ORDER_OF_ADDING_RULES_TO_INITIAL_CUBE_PRUNING_QUEUE + ": %s",  use_shuffling_to_randomize_rule_order_of_adding_rules_to_initial_cube_pruning_queue));
           } 
           else if (parameter
               .equals(normalize_key(MAX_NUMBER_ALTERNATIVE_LABELED_VERSIONS_PER_LANGUAGE_MODEL_STATE))) {

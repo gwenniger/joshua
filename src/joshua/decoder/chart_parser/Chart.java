@@ -283,9 +283,13 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
 
     }
     
-    // Shuffle the list off RuleCollection-DotNode pairs. The goal of this, is to promote diversity in the order 
-    // in which the RuleCollections are processed. 
-    Collections.shuffle(allRuleCollections);
+    
+    if(useShuffling()){
+      // Shuffle the list off RuleCollection-DotNode pairs. The goal of this, is to promote diversity in the order 
+      // in which the RuleCollections are processed. 
+      Collections.shuffle(allRuleCollections);
+    }  
+    
     for(Pair<RuleCollection,T> ruleCollectionDotNodePair : allRuleCollections){              
       createInitialCubePruningStatesForRuleCollection(candidates, ruleCollectionDotNodePair.getFirst(), ruleCollectionDotNodePair.getSecond(), i, j);    
     }
@@ -296,7 +300,9 @@ public class Chart<T extends joshua.decoder.chart_parser.DotChart.DotNodeBase<T2
     applyCubePruning(i, j, candidates,restrictLabeledVersionsLanguageModelStatePruning);
   }
  
-  
+  private boolean useShuffling(){
+    return config.use_shuffling_to_randomize_rule_order_of_adding_rules_to_initial_cube_pruning_queue;
+  }
 
   
   
