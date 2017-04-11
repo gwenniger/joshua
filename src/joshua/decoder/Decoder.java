@@ -38,6 +38,8 @@ import joshua.util.FileUtility;
 import joshua.util.FormatUtils;
 import joshua.util.Regex;
 import joshua.util.io.LineReader;
+import joshua.util.threadCpuTime.ThreadCpuTimeKeeper;
+import joshua.util.threadCpuTime.ThreadCpuTimer;
 
 /**
  * This class handles decoder initialization and the complication introduced by multithreading.
@@ -160,10 +162,14 @@ public class Decoder {
      */
     private OutputStream out;
     
-    RequestParallelizer(TranslationRequestStream request, Translations response, OutputStream out) {
+    private final ThreadCpuTimer threadCpuTimer;
+    
+    RequestParallelizer(TranslationRequestStream request, Translations response, OutputStream out,
+        ThreadCpuTimer threadCpuTimer) {
       this.request = request;
       this.response = response;
       this.out = out;
+      this.threadCpuTimer = threadCpuTimer;
     }
 
     @Override
@@ -196,7 +202,7 @@ public class Decoder {
 
         // This will block until a DecoderThread becomes available.
         DecoderThread thread = Decoder.this.getThread();
-        new DecoderThreadRunner(thread, sentence, response).start();
+        new DecoderThreadRunner(thread, sentence, response,threadCpuTimer).start();
       }
     }
 
@@ -377,15 +383,22 @@ public class Decoder {
     private final DecoderThread decoderThread;
     private final Sentence sentence;
     private final Translations translations;
+    
+    // A ThreadCpuTimeKeeper, necessary to keep track of the gpu time used by this Thread
+    private final ThreadCpuTimer threadCpuTimer;
 
-    DecoderThreadRunner(DecoderThread thread, Sentence sentence, Translations translations) {
+    DecoderThreadRunner(DecoderThread thread, Sentence sentence, Translations translations,
+        ThreadCpuTimer threadCpuTimer) {
       this.decoderThread = thread;
       this.sentence = sentence;
       this.translations = translations;
+      this.threadCpuTimer = threadCpuTimer;
     }
 
     @Override
     public void run() {
+      threadCpuTimer.startThreadCpuTimer(this);
+      
       /*
        * Use the thread to translate the sentence. Then record the translation with the
        * corresponding Translations object, and return the thread to the pool.
@@ -406,6 +419,8 @@ public class Decoder {
         System.exit(1);;
 //        translations.record(new Translation(sentence, null, featureFunctions, joshuaConfiguration));
       }
+      
+      threadCpuTimer.stopThreadCpuTimer(this);
     }
   }
 
@@ -418,11 +433,15 @@ public class Decoder {
    * @return an iterable set of Translation objects
    * @throws IOException 
    */
-  public void decodeAll(TranslationRequestStream request, OutputStream out) throws IOException {
+  public void decodeAll(TranslationRequestStream request, OutputStream out, ThreadCpuTimer threadCpuTimer) throws IOException {
     Translations translations = new Translations(request);
 
+    if(threadCpuTimer == null){
+      throw new RuntimeException("Error: Decoder.decodeAll: ThreadCpuTimer is null!!!");
+    }
+    
     /* Start a thread to handle requests on the input stream */
-    new RequestParallelizer(request, translations, out).start();
+    new RequestParallelizer(request, translations, out, threadCpuTimer).start();
     
     for (;;) {
       Translation translation = translations.next();
@@ -704,6 +723,20 @@ public class Decoder {
 
     return this;
   }
+  
+  
+  /**
+   * Get the decoder thread list. This is necessary for CPU timing.
+   * @return
+   */
+  public List<DecoderThread> getDecoderThreadList(){
+    List<DecoderThread> result = new ArrayList<>();
+    for(Object threadObject : this.threadPool.toArray()){
+      result.add((DecoderThread) threadObject);
+    }
+    return result;
+  }
+  
   
   /**
    * TODO: How to generically check if there are sparse features besides OVV?

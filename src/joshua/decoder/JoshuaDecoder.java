@@ -8,6 +8,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.net.InetSocketAddress;
+import java.util.List;
 import java.util.logging.Logger;
 
 import com.sun.net.httpserver.HttpServer;
@@ -15,6 +16,9 @@ import com.sun.net.httpserver.HttpServer;
 import joshua.decoder.JoshuaConfiguration.SERVER_TYPE;
 import joshua.decoder.io.TranslationRequestStream;
 import joshua.server.TcpServer;
+import joshua.util.threadCpuTime.ThreadCpuTimeKeeper;
+import joshua.util.threadCpuTime.ThreadCpuTimeKeeperBogus;
+import joshua.util.threadCpuTime.ThreadCpuTimer;
 import joshua.server.ServerThread;
 
 /**
@@ -37,6 +41,14 @@ public class JoshuaDecoder {
     JoshuaConfiguration joshuaConfiguration = new JoshuaConfiguration();
     ArgsParser userArgs = new ArgsParser(args,joshuaConfiguration);
 
+    ThreadCpuTimer threadCpuTimeKeeper = null;
+    if(joshuaConfiguration.logCpuComputationTimes()){
+      threadCpuTimeKeeper = ThreadCpuTimeKeeper.createThreadCpuTimeKeeper();
+    }
+    else{
+      threadCpuTimeKeeper = ThreadCpuTimeKeeperBogus.createThreadCpuTimeKeeperBogus();
+    }
+    
     String logFile = System.getenv().get("JOSHUA") + "/logging.properties";
     try {
       java.util.logging.LogManager.getLogManager().readConfiguration(new FileInputStream(logFile));
@@ -44,6 +56,7 @@ public class JoshuaDecoder {
       logger.warning("Couldn't initialize logging properties from '" + logFile + "'");
     }
 
+    
     long startTime = System.currentTimeMillis();
 
     /* Step-0: some sanity checking */
@@ -51,6 +64,16 @@ public class JoshuaDecoder {
 
     /* Step-1: initialize the decoder, test-set independent */
     Decoder decoder = new Decoder(joshuaConfiguration, userArgs.getConfigFile());
+    
+    /*
+    List<DecoderThread> decoderThreads = null;
+    if(joshuaConfiguration.logCpuComputationTimes()){
+      // Register the decoder thread start times
+      decoderThreads = decoder.getDecoderThreadList();
+      for(DecoderThread decoderThread : decoderThreads){
+        threadCpuTimeKeeper.registerThreadStartTime(decoderThread);
+      }
+    } */  
 
     Decoder.LOG(1, String.format("Model loading took %d seconds",
         (System.currentTimeMillis() - startTime) / 1000));
@@ -89,7 +112,8 @@ public class JoshuaDecoder {
 
     BufferedReader reader = new BufferedReader(new InputStreamReader(input));
     TranslationRequestStream fileRequest = new TranslationRequestStream(reader, joshuaConfiguration);
-    decoder.decodeAll(fileRequest, new PrintStream(System.out));
+    decoder.decodeAll(fileRequest, new PrintStream(System.out),threadCpuTimeKeeper);
+
     
     if (joshuaConfiguration.n_best_file != null)
       out.close();
@@ -98,6 +122,11 @@ public class JoshuaDecoder {
     Decoder.LOG(1, String.format("Memory used %.1f MB", ((Runtime.getRuntime().totalMemory() - Runtime
         .getRuntime().freeMemory()) / 1000000.0)));
 
+    
+    if(joshuaConfiguration.logCpuComputationTimes()){
+      ((ThreadCpuTimeKeeper)threadCpuTimeKeeper).registerEndTimeMainThreadAndReportThreadTimeUsageToFile(joshuaConfiguration.getCpuComputationTimesLogFilePath());
+    }
+    
     /* Step-3: clean up */
     decoder.cleanUp();
     Decoder.LOG(1, String.format("Total running time: %d seconds",

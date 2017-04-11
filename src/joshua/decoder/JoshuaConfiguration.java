@@ -248,6 +248,24 @@ public class JoshuaConfiguration {
   public int max_number_alternative_labeled_versions_per_language_model_state = 0;
   public static final String MAX_NUMBER_ALTERNATIVE_LABELED_VERSIONS_PER_LANGUAGE_MODEL_STATE = "max_number_alternative_labeled_versions_per_language_model_state";
 
+  /**
+   *   Whether to log CPU computation times. This logging is useful when running experiments on a server, 
+   *   as due to differences in the amount of traffic, cpu computation times may be unreliable.
+   */
+  public static final String LOG_CPU_COMPUTATION_TIMES_PROPERTY = "log_cpu_computation_times";
+  private boolean log_cpu_computation_times = false;
+  public boolean logCpuComputationTimes(){
+    return log_cpu_computation_times;
+  }
+  private static final String CPU_COMPUTATION_TIMES_LOG_FILE_PATH_PROPERTY = "cpu_computation_times_log_file_path";
+  private String cpu_computation_times_log_file_path = null;
+  public String getCpuComputationTimesLogFilePath(){
+    return cpu_computation_times_log_file_path;
+  }
+  
+  
+  
+  
   /***
    * Phrase-based decoding parameters.
    */
@@ -650,6 +668,18 @@ public class JoshuaConfiguration {
               .equals(normalize_key(MAX_NUMBER_ALTERNATIVE_LABELED_VERSIONS_PER_LANGUAGE_MODEL_STATE))) {
             max_number_alternative_labeled_versions_per_language_model_state = Integer.parseInt(fds[1]);
             logger.finest(String.format(MAX_NUMBER_ALTERNATIVE_LABELED_VERSIONS_PER_LANGUAGE_MODEL_STATE + ": %s",  max_number_alternative_labeled_versions_per_language_model_state));
+
+          }
+          else if (parameter
+              .equals(normalize_key(LOG_CPU_COMPUTATION_TIMES_PROPERTY))) {
+            log_cpu_computation_times = Boolean.parseBoolean(fds[1]);
+            logger.finest(String.format(LOG_CPU_COMPUTATION_TIMES_PROPERTY + ": %s",  log_cpu_computation_times));
+
+          }
+          else if (parameter
+              .equals(normalize_key(CPU_COMPUTATION_TIMES_LOG_FILE_PATH_PROPERTY))) {
+            cpu_computation_times_log_file_path = fds[1];
+            logger.finest(String.format(CPU_COMPUTATION_TIMES_LOG_FILE_PATH_PROPERTY + ": %s",  cpu_computation_times_log_file_path));
 
           } 
           else if (parameter.equals(normalize_key("fragment-map"))) {

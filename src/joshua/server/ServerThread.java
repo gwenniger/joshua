@@ -17,6 +17,7 @@ import com.sun.net.httpserver.HttpHandler;
 import joshua.decoder.Decoder;
 import joshua.decoder.JoshuaConfiguration;
 import joshua.decoder.io.TranslationRequestStream;
+import joshua.util.threadCpuTime.ThreadCpuTimeKeeperBogus;
 
 /**
  * This class handles a concurrent request for translations from a newly opened socket.
@@ -54,7 +55,7 @@ public class ServerThread extends Thread implements HttpHandler {
       TranslationRequestStream request = new TranslationRequestStream(reader, joshuaConfiguration);
 
       try {
-        decoder.decodeAll(request, socket.getOutputStream());
+        decoder.decodeAll(request, socket.getOutputStream(),ThreadCpuTimeKeeperBogus.createThreadCpuTimeKeeperBogus());
 
       } catch (SocketException e) {
         System.err.println("* WARNING: Socket interrupted");
@@ -117,7 +118,7 @@ public class ServerThread extends Thread implements HttpHandler {
     BufferedReader reader = new BufferedReader(new StringReader(query));
     TranslationRequestStream request = new TranslationRequestStream(reader, joshuaConfiguration);
     
-    decoder.decodeAll(request, new HttpWriter(client));
+    decoder.decodeAll(request, new HttpWriter(client),ThreadCpuTimeKeeperBogus.createThreadCpuTimeKeeperBogus());
     reader.close();
   }
 }
