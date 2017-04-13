@@ -400,16 +400,7 @@ public class ThreadCpuTimeKeeper implements ThreadCpuTimer {
     result += NL + "\n======================================================";
     result += NL + "============ ThreadCpuTimeKeeper Report ==============";
     result += NL + "======================================================";
-    result += NL + "Time used by main thread:\n" + threadIDToCpuTimingMap.get(mainThreadID) + "\n";
-
-    result += NL + "Time used by other threads:";
-    for (Entry<Long, ThreadCpuTimeStampDifference> entry : threadIDToCpuTimingMap.entrySet()) {
-      long threadId = entry.getKey();
-      if (threadId != mainThreadID) {
-        result += NL + entry.getValue();
-      }
-    }
-
+   
     result += NL + "<Summary>";
 
     result += NL + "Total wall clock time spent (nanoseconds: "
@@ -440,6 +431,21 @@ public class ThreadCpuTimeKeeper implements ThreadCpuTimer {
 
     result += NL + "</Summary>";
 
+    
+    result += NL + NL + "<Details>";
+    
+    result += NL + "Time used by main thread:\n" + threadIDToCpuTimingMap.get(mainThreadID) + "\n";
+
+    result += NL + "Time used by other threads:";
+    for (Entry<Long, ThreadCpuTimeStampDifference> entry : threadIDToCpuTimingMap.entrySet()) {
+      long threadId = entry.getKey();
+      if (threadId != mainThreadID) {
+        result += NL + entry.getValue();
+      }
+    }
+
+    result += NL + "</Details>";
+    
     result += NL + "\n======================================================";
     result += NL + "======================================================";
     result += NL + "======================================================";
